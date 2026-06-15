@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /home/daniel/workspace/ascrollbox/lib/models /home/daniel/workspace/ascrollbox/lib/services /home/daniel/workspace/ascrollbox/lib/providers /home/daniel/workspace/ascrollbox/lib/widgets)"
+    ],
+    "additionalDirectories": [
+      "/home/daniel/workspace/ascrollbox/lib"
+    ]
+  }
+}

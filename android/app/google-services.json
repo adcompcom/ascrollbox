@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "636974612097",
+    "project_id": "ascrollbox",
+    "storage_bucket": "ascrollbox.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:636974612097:android:8794a54c6d36b811b31780",
+        "android_client_info": {
+          "package_name": "com.ascrollbox.ascrollbox"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "636974612097-n0fhvf57mikadv89e991u3hjfku41ejn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ascrollbox.ascrollbox",
+            "certificate_hash": "d0ef0cb1f672b5ed08e9705166ff23e5e670e82b"
+          }
+        },
+        {
+          "client_id": "636974612097-tmr51u8bjf9aau1icsuuvea7sdeplt9l.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALQPRsUXvxtAoAZmFtQ4SMdd_0qoPquOY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "636974612097-tmr51u8bjf9aau1icsuuvea7sdeplt9l.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

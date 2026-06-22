@@ -1,5 +1,7 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -13,6 +15,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/firestore_service.dart';
 import 'services/metadata_service.dart';
+import 'services/storage_service.dart';
 import 'theme.dart';
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
@@ -87,17 +90,29 @@ void main() async {
 
   if (isShare) {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await _activateAppCheck();
     runApp(const _ShareApp());
     return;
   }
 
   runApp(const _SplashApp());
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await _activateAppCheck();
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppProvider(),
       child: const App(),
     ),
+  );
+}
+
+// ── App Check ─────────────────────────────────────────────────────────────────
+
+Future<void> _activateAppCheck() async {
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: kDebugMode
+        ? AndroidProvider.debug
+        : AndroidProvider.playIntegrity,
   );
 }
 
@@ -207,10 +222,10 @@ class _ShareScreenState extends State<_ShareScreen> {
     await showSaveSheet(
       context,
       url: url,
-      onSave: (tags) {
+      onSave: (tags, isPrivate) {
         handled = true;
         Navigator.pop(context);
-        _saveAndClose(user.uid, url, tags);
+        _saveAndClose(user.uid, url, tags, isPrivate);
       },
       onCancel: () {
         handled = true;
@@ -223,9 +238,16 @@ class _ShareScreenState extends State<_ShareScreen> {
     if (!handled) _close();
   }
 
-  Future<void> _saveAndClose(String uid, String url, List<String> tags) async {
+  Future<void> _saveAndClose(
+      String uid, String url, List<String> tags, bool isPrivate) async {
     try {
       final meta = await MetadataService().fetch(url);
+
+      final thumbnailUrl = meta.thumbnailUrl.isNotEmpty
+          ? (await StorageService().uploadThumbnail(uid, meta.thumbnailUrl) ??
+              meta.thumbnailUrl)
+          : '';
+
       await FirestoreService().addVideo(
         uid,
         VideoModel(
@@ -233,10 +255,11 @@ class _ShareScreenState extends State<_ShareScreen> {
           url: url,
           platform: meta.platform,
           title: meta.title.isEmpty ? url : meta.title,
-          thumbnailUrl: meta.thumbnailUrl,
+          thumbnailUrl: thumbnailUrl,
           tags: tags,
           packIds: [],
           createdAt: DateTime.now(),
+          isPrivate: isPrivate,
         ),
       );
     } finally {

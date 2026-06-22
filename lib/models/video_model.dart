@@ -10,6 +10,7 @@ class VideoModel {
   final List<String> packIds;
   final DateTime createdAt;
   final String? notes;
+  final bool isPrivate;
 
   VideoModel({
     required this.id,
@@ -21,6 +22,7 @@ class VideoModel {
     required this.packIds,
     required this.createdAt,
     this.notes,
+    this.isPrivate = false,
   });
 
   factory VideoModel.fromFirestore(DocumentSnapshot doc) {
@@ -45,6 +47,7 @@ class VideoModel {
       packIds: List<String>.from(data['packIds'] ?? []),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       notes: data['notes'],
+      isPrivate: data['isPrivate'] as bool? ?? false,
     );
   }
 
@@ -57,6 +60,7 @@ class VideoModel {
         'packIds': packIds,
         'createdAt': Timestamp.fromDate(createdAt),
         if (notes != null) 'notes': notes,
+        'isPrivate': isPrivate,
       };
 
   String get embedUrl {
@@ -113,6 +117,7 @@ class VideoModel {
     List<String>? packIds,
     DateTime? createdAt,
     String? notes,
+    bool? isPrivate,
   }) =>
       VideoModel(
         id: id ?? this.id,
@@ -124,5 +129,6 @@ class VideoModel {
         packIds: packIds ?? this.packIds,
         createdAt: createdAt ?? this.createdAt,
         notes: notes ?? this.notes,
+        isPrivate: isPrivate ?? this.isPrivate,
       );
 }

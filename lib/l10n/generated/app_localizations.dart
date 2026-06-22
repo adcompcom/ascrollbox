@@ -1117,6 +1117,444 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save changes'**
   String get saveChanges;
+
+  /// No description provided for @privateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Private'**
+  String get privateTitle;
+
+  /// No description provided for @privateSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a private PIN'**
+  String get privateSetupTitle;
+
+  /// No description provided for @privateSetupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a 6-digit PIN to protect your private videos'**
+  String get privateSetupSubtitle;
+
+  /// No description provided for @privateConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your PIN'**
+  String get privateConfirmTitle;
+
+  /// No description provided for @privateConfirmSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat the 6 digits'**
+  String get privateConfirmSubtitle;
+
+  /// No description provided for @privateEnterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your 6-digit PIN'**
+  String get privateEnterSubtitle;
+
+  /// No description provided for @privatePinMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'PINs do not match'**
+  String get privatePinMismatch;
+
+  /// No description provided for @privatePinWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect PIN'**
+  String get privatePinWrong;
+
+  /// No description provided for @privateEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No private videos'**
+  String get privateEmpty;
+
+  /// No description provided for @privateEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move videos here or mark them\nprivate when saving'**
+  String get privateEmptySubtitle;
+
+  /// No description provided for @markAsPrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Private'**
+  String get markAsPrivate;
+
+  /// No description provided for @moveToPrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to Private'**
+  String get moveToPrivate;
+
+  /// No description provided for @moveToHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to Home'**
+  String get moveToHome;
+
+  /// No description provided for @movedToPrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to Private'**
+  String get movedToPrivate;
+
+  /// No description provided for @movedToHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to Home'**
+  String get movedToHome;
+
+  /// No description provided for @privateForgotPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot your PIN?'**
+  String get privateForgotPin;
+
+  /// No description provided for @sqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Questions'**
+  String get sqTitle;
+
+  /// No description provided for @sqSetupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer 3 questions so you can recover your PIN if you forget it.'**
+  String get sqSetupSubtitle;
+
+  /// No description provided for @sqVerifySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer your security questions to reset your PIN.'**
+  String get sqVerifySubtitle;
+
+  /// No description provided for @sqSelectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a question…'**
+  String get sqSelectHint;
+
+  /// No description provided for @sqAnswerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your answer…'**
+  String get sqAnswerHint;
+
+  /// No description provided for @sqSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save questions'**
+  String get sqSave;
+
+  /// No description provided for @sqVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get sqVerify;
+
+  /// No description provided for @sqWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'One or more answers are incorrect. Try again.'**
+  String get sqWrong;
+
+  /// No description provided for @sqSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select and answer all 3 questions.'**
+  String get sqSelectAll;
+
+  /// No description provided for @sqDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Please choose 3 different questions.'**
+  String get sqDuplicate;
+
+  /// No description provided for @sqPet.
+  ///
+  /// In en, this message translates to:
+  /// **'What was the name of your first pet?'**
+  String get sqPet;
+
+  /// No description provided for @sqMother.
+  ///
+  /// In en, this message translates to:
+  /// **'What is your mother\'s maiden name?'**
+  String get sqMother;
+
+  /// No description provided for @sqSchool.
+  ///
+  /// In en, this message translates to:
+  /// **'What was the name of your first school?'**
+  String get sqSchool;
+
+  /// No description provided for @sqFriend.
+  ///
+  /// In en, this message translates to:
+  /// **'What is the name of your childhood best friend?'**
+  String get sqFriend;
+
+  /// No description provided for @sqCity.
+  ///
+  /// In en, this message translates to:
+  /// **'What city were you born in?'**
+  String get sqCity;
+
+  /// No description provided for @sqSibling.
+  ///
+  /// In en, this message translates to:
+  /// **'What is your oldest sibling\'s first name?'**
+  String get sqSibling;
+
+  /// No description provided for @sqCar.
+  ///
+  /// In en, this message translates to:
+  /// **'What was the make of your first car?'**
+  String get sqCar;
+
+  /// No description provided for @sqStreet.
+  ///
+  /// In en, this message translates to:
+  /// **'What street did you grow up on?'**
+  String get sqStreet;
+
+  /// No description provided for @myPacks.
+  ///
+  /// In en, this message translates to:
+  /// **'My Packs'**
+  String get myPacks;
+
+  /// No description provided for @sharedPacks.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared'**
+  String get sharedPacks;
+
+  /// No description provided for @packDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get packDescription;
+
+  /// No description provided for @packDescriptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe your pack…'**
+  String get packDescriptionHint;
+
+  /// No description provided for @packShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share pack'**
+  String get packShare;
+
+  /// No description provided for @packPublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get packPublish;
+
+  /// No description provided for @packUnpublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop sharing'**
+  String get packUnpublish;
+
+  /// No description provided for @packPublicLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Public'**
+  String get packPublicLabel;
+
+  /// No description provided for @packPublicSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible to all users in the community'**
+  String get packPublicSubtitle;
+
+  /// No description provided for @packCodeOnlyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code only'**
+  String get packCodeOnlyLabel;
+
+  /// No description provided for @packCodeOnlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only accessible via share code'**
+  String get packCodeOnlySubtitle;
+
+  /// No description provided for @packShareCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Share code'**
+  String get packShareCode;
+
+  /// No description provided for @packShareCodeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied!'**
+  String get packShareCodeCopied;
+
+  /// No description provided for @packViews.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} views'**
+  String packViews(int count);
+
+  /// No description provided for @packShares.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} saves'**
+  String packShares(int count);
+
+  /// No description provided for @packRatingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} ratings'**
+  String packRatingCount(int count);
+
+  /// No description provided for @packAddToShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Shared'**
+  String get packAddToShared;
+
+  /// No description provided for @packAddedToShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to Shared!'**
+  String get packAddedToShared;
+
+  /// No description provided for @packRemoveFromShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from Shared'**
+  String get packRemoveFromShared;
+
+  /// No description provided for @packRemovedFromShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed from Shared'**
+  String get packRemovedFromShared;
+
+  /// No description provided for @packRateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate this pack'**
+  String get packRateTitle;
+
+  /// No description provided for @packRated.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks for rating!'**
+  String get packRated;
+
+  /// No description provided for @packEnterCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter pack code'**
+  String get packEnterCode;
+
+  /// No description provided for @packCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'6-character code (e.g. A3K9F2)'**
+  String get packCodeHint;
+
+  /// No description provided for @packNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack not found. Check the code and try again.'**
+  String get packNotFound;
+
+  /// No description provided for @packSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get packSearch;
+
+  /// No description provided for @packExplore.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore community'**
+  String get packExplore;
+
+  /// No description provided for @sharedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved packs yet'**
+  String get sharedEmpty;
+
+  /// No description provided for @sharedEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore the community or enter a code\nto find packs shared by others.'**
+  String get sharedEmptySubtitle;
+
+  /// No description provided for @communityEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No public packs yet'**
+  String get communityEmpty;
+
+  /// No description provided for @communityEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Be the first to share a pack with the community!'**
+  String get communityEmptySubtitle;
+
+  /// No description provided for @packPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack published!'**
+  String get packPublished;
+
+  /// No description provided for @packUnpublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack removed from community'**
+  String get packUnpublished;
+
+  /// No description provided for @packBy.
+  ///
+  /// In en, this message translates to:
+  /// **'By {name}'**
+  String packBy(String name);
+
+  /// No description provided for @packNoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get packNoDescription;
+
+  /// No description provided for @packIsPublic.
+  ///
+  /// In en, this message translates to:
+  /// **'This pack is public'**
+  String get packIsPublic;
+
+  /// No description provided for @packIsCodeOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessible via code'**
+  String get packIsCodeOnly;
+
+  /// No description provided for @packShareSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Share settings'**
+  String get packShareSettings;
+
+  /// No description provided for @packAlreadySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Already in your Shared section'**
+  String get packAlreadySaved;
 }
 
 class _AppLocalizationsDelegate

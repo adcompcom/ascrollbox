@@ -9,11 +9,14 @@ import '../models/tag_model.dart';
 import '../models/video_model.dart';
 import '../providers/app_provider.dart';
 import '../services/auth_service.dart';
+import '../services/firestore_service.dart';
 import '../services/metadata_service.dart';
 import '../services/tag_classifier.dart';
 import '../widgets/video_card.dart';
 import 'categories_screen.dart';
 import 'packs_screen.dart';
+import 'pin_entry_screen.dart';
+import 'private_screen.dart';
 import 'video_player_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -41,9 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
     await showSaveSheet(
       context,
       url: url,
-      onSave: (tags) async {
+      onSave: (tags, isPrivate) async {
         Navigator.pop(context);
-        await provider.saveVideo(widget.user.uid, url, tags);
+        await provider.saveVideo(widget.user.uid, url, tags, isPrivate: isPrivate);
         provider.setPendingShare(null);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -56,6 +59,38 @@ class _HomeScreenState extends State<HomeScreen> {
         provider.setPendingShare(null);
       },
     );
+  }
+
+  Future<void> _moveToPrivate(VideoModel video) async {
+    final l10n = AppLocalizations.of(context);
+    await context.read<AppProvider>().moveToPrivate(widget.user.uid, video.id);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.movedToPrivate)),
+      );
+    }
+  }
+
+  Future<void> _openPrivateSection() async {
+    final uid = widget.user.uid;
+    final hash = await FirestoreService().getPrivatePinHash(uid);
+    if (!mounted) return;
+    final success = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PinEntryScreen(
+          uid: uid,
+          isSetup: hash == null,
+          existingPinHash: hash,
+        ),
+      ),
+    );
+    if (success == true && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => PrivateScreen(user: widget.user)),
+      );
+    }
   }
 
   Future<void> _showAddUrlDialog() async {
@@ -266,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      drawer: _AppDrawer(user: widget.user),
+      drawer: _AppDrawer(user: widget.user, onPrivateTap: _openPrivateSection),
       body: Column(
         children: [
           // ── Search bar ───────────────────────────────────────
@@ -340,6 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         onDelete: () => _confirmDelete(video),
                         onAddToPack: () => _showAddToPackDialog(video),
                         onEdit: () => _showEditSheet(video),
+                        onMoveToPrivate: () => _moveToPrivate(video),
                       );
                     },
                   ),
@@ -418,7 +454,8 @@ class _TagFilterBar extends StatelessWidget {
 
 class _AppDrawer extends StatelessWidget {
   final User user;
-  const _AppDrawer({required this.user});
+  final VoidCallback onPrivateTap;
+  const _AppDrawer({required this.user, required this.onPrivateTap});
 
   @override
   Widget build(BuildContext context) {
@@ -467,6 +504,14 @@ class _AppDrawer extends StatelessWidget {
               Navigator.pop(context);
               Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const PacksScreen()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.lock_outline),
+            title: Text(l10n.privateTitle),
+            onTap: () {
+              Navigator.pop(context);
+              onPrivateTap();
             },
           ),
           const Divider(),
@@ -536,7 +581,7 @@ class _EmptyState extends StatelessWidget {
 Future<void> showSaveSheet(
   BuildContext context, {
   required String url,
-  required void Function(List<String>) onSave,
+  required void Function(List<String> tags, bool isPrivate) onSave,
   required VoidCallback onCancel,
 }) {
   return showModalBottomSheet(
@@ -566,7 +611,7 @@ Future<void> showSaveSheet(
 class _SaveVideoSheet extends StatefulWidget {
   final String url;
   final ScrollController scrollController;
-  final void Function(List<String> tags) onSave;
+  final void Function(List<String> tags, bool isPrivate) onSave;
   final VoidCallback onCancel;
 
   const _SaveVideoSheet({
@@ -586,6 +631,7 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
   final Set<String> _selected = {};
   List<String> _suggested = [];
   bool _suggesting = true;
+  bool _isPrivate = false;
   final _customController = TextEditingController();
   @override
   void initState() {
@@ -784,20 +830,57 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
             color: Theme.of(context).colorScheme.surface,
             border: Border(top: BorderSide(color: Colors.grey.shade200)),
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: widget.onCancel,
-                  child: Text(l10n.cancel),
-                ),
+              // Private switch
+              Row(
+                children: [
+                  Icon(
+                    _isPrivate ? Icons.lock : Icons.lock_open_outlined,
+                    size: 18,
+                    color: _isPrivate
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey[500],
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.markAsPrivate,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: _isPrivate
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.grey[700],
+                      fontWeight: _isPrivate
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                  ),
+                  const Spacer(),
+                  Switch(
+                    value: _isPrivate,
+                    onChanged: (v) => setState(() => _isPrivate = v),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => widget.onSave(_selected.toList()),
-                  child: Text(l10n.save),
-                ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: widget.onCancel,
+                      child: Text(l10n.cancel),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () =>
+                          widget.onSave(_selected.toList(), _isPrivate),
+                      child: Text(l10n.save),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

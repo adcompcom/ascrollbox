@@ -9,16 +9,22 @@ class VideoCard extends StatelessWidget {
   final VideoModel video;
   final VoidCallback onTap;
   final VoidCallback? onDelete;
+  final VoidCallback? onRemoveFromPack;
   final VoidCallback? onAddToPack;
   final VoidCallback? onEdit;
+  final VoidCallback? onMoveToPrivate;
+  final VoidCallback? onMoveToPublic;
 
   const VideoCard({
     super.key,
     required this.video,
     required this.onTap,
     this.onDelete,
+    this.onRemoveFromPack,
     this.onAddToPack,
     this.onEdit,
+    this.onMoveToPrivate,
+    this.onMoveToPublic,
   });
 
   @override
@@ -127,6 +133,35 @@ class VideoCard extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   onAddToPack!();
+                },
+              ),
+            if (onMoveToPrivate != null)
+              ListTile(
+                leading: const Icon(Icons.lock_outline),
+                title: Text(l10n.moveToPrivate),
+                onTap: () {
+                  Navigator.pop(context);
+                  onMoveToPrivate!();
+                },
+              ),
+            if (onMoveToPublic != null)
+              ListTile(
+                leading: const Icon(Icons.lock_open_outlined),
+                title: Text(l10n.moveToHome),
+                onTap: () {
+                  Navigator.pop(context);
+                  onMoveToPublic!();
+                },
+              ),
+            if (onRemoveFromPack != null)
+              ListTile(
+                leading: const Icon(Icons.remove_circle_outline,
+                    color: AppColors.red),
+                title: Text(l10n.removeFromPack,
+                    style: const TextStyle(color: AppColors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  onRemoveFromPack!();
                 },
               ),
             if (onDelete != null)

@@ -537,4 +537,241 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get saveChanges => 'Guardar cambios';
+
+  @override
+  String get privateTitle => 'Privado';
+
+  @override
+  String get privateSetupTitle => 'Crear clave privada';
+
+  @override
+  String get privateSetupSubtitle =>
+      'Elige una clave de 6 dígitos para proteger tus videos privados';
+
+  @override
+  String get privateConfirmTitle => 'Confirmar clave';
+
+  @override
+  String get privateConfirmSubtitle => 'Repite los 6 dígitos';
+
+  @override
+  String get privateEnterSubtitle => 'Ingresa tu clave de 6 dígitos';
+
+  @override
+  String get privatePinMismatch => 'Las claves no coinciden';
+
+  @override
+  String get privatePinWrong => 'Clave incorrecta';
+
+  @override
+  String get privateEmpty => 'No tienes videos privados';
+
+  @override
+  String get privateEmptySubtitle =>
+      'Mueve videos aquí o márcalos como\nprivados al guardar';
+
+  @override
+  String get markAsPrivate => 'Privado';
+
+  @override
+  String get moveToPrivate => 'Mover a Privado';
+
+  @override
+  String get moveToHome => 'Mover a Inicio';
+
+  @override
+  String get movedToPrivate => 'Movido a Privado';
+
+  @override
+  String get movedToHome => 'Movido a Inicio';
+
+  @override
+  String get privateForgotPin => '¿Olvidaste tu clave?';
+
+  @override
+  String get sqTitle => 'Preguntas de seguridad';
+
+  @override
+  String get sqSetupSubtitle =>
+      'Responde 3 preguntas para poder recuperar tu clave si la olvidas.';
+
+  @override
+  String get sqVerifySubtitle =>
+      'Responde tus preguntas de seguridad para restablecer tu clave.';
+
+  @override
+  String get sqSelectHint => 'Selecciona una pregunta…';
+
+  @override
+  String get sqAnswerHint => 'Tu respuesta…';
+
+  @override
+  String get sqSave => 'Guardar preguntas';
+
+  @override
+  String get sqVerify => 'Verificar';
+
+  @override
+  String get sqWrong =>
+      'Una o más respuestas son incorrectas. Intenta de nuevo.';
+
+  @override
+  String get sqSelectAll => 'Por favor selecciona y responde las 3 preguntas.';
+
+  @override
+  String get sqDuplicate => 'Por favor elige 3 preguntas diferentes.';
+
+  @override
+  String get sqPet => '¿Cómo se llamaba tu primera mascota?';
+
+  @override
+  String get sqMother => '¿Cuál es el apellido de soltera de tu madre?';
+
+  @override
+  String get sqSchool => '¿Cómo se llamaba tu primera escuela?';
+
+  @override
+  String get sqFriend =>
+      '¿Cuál es el nombre de tu mejor amigo/a de la infancia?';
+
+  @override
+  String get sqCity => '¿En qué ciudad naciste?';
+
+  @override
+  String get sqSibling => '¿Cuál es el nombre de tu hermano/a mayor?';
+
+  @override
+  String get sqCar => '¿Cuál era la marca de tu primer auto?';
+
+  @override
+  String get sqStreet => '¿En qué calle creciste?';
+
+  @override
+  String get myPacks => 'Mis Packs';
+
+  @override
+  String get sharedPacks => 'Compartidos';
+
+  @override
+  String get packDescription => 'Descripción';
+
+  @override
+  String get packDescriptionHint => 'Describe tu pack…';
+
+  @override
+  String get packShare => 'Compartir pack';
+
+  @override
+  String get packPublish => 'Publicar';
+
+  @override
+  String get packUnpublish => 'Dejar de compartir';
+
+  @override
+  String get packPublicLabel => 'Público';
+
+  @override
+  String get packPublicSubtitle =>
+      'Visible para todos los usuarios de la comunidad';
+
+  @override
+  String get packCodeOnlyLabel => 'Solo por código';
+
+  @override
+  String get packCodeOnlySubtitle => 'Solo accesible con el código de acceso';
+
+  @override
+  String get packShareCode => 'Código de acceso';
+
+  @override
+  String get packShareCodeCopied => '¡Código copiado!';
+
+  @override
+  String packViews(int count) {
+    return '$count visualizaciones';
+  }
+
+  @override
+  String packShares(int count) {
+    return '$count guardados';
+  }
+
+  @override
+  String packRatingCount(int count) {
+    return '$count calificaciones';
+  }
+
+  @override
+  String get packAddToShared => 'Agregar a Compartidos';
+
+  @override
+  String get packAddedToShared => '¡Agregado a Compartidos!';
+
+  @override
+  String get packRemoveFromShared => 'Quitar de Compartidos';
+
+  @override
+  String get packRemovedFromShared => 'Eliminado de Compartidos';
+
+  @override
+  String get packRateTitle => 'Califica este pack';
+
+  @override
+  String get packRated => '¡Gracias por calificar!';
+
+  @override
+  String get packEnterCode => 'Ingresar código';
+
+  @override
+  String get packCodeHint => 'Código de 6 caracteres (ej. A3K9F2)';
+
+  @override
+  String get packNotFound =>
+      'Pack no encontrado. Verifica el código e intenta de nuevo.';
+
+  @override
+  String get packSearch => 'Buscar';
+
+  @override
+  String get packExplore => 'Explorar comunidad';
+
+  @override
+  String get sharedEmpty => 'Aún no tienes packs guardados';
+
+  @override
+  String get sharedEmptySubtitle =>
+      'Explora la comunidad o ingresa un código\npara encontrar packs compartidos.';
+
+  @override
+  String get communityEmpty => 'Aún no hay packs públicos';
+
+  @override
+  String get communityEmptySubtitle =>
+      '¡Sé el primero en compartir un pack con la comunidad!';
+
+  @override
+  String get packPublished => '¡Pack publicado!';
+
+  @override
+  String get packUnpublished => 'Pack eliminado de la comunidad';
+
+  @override
+  String packBy(String name) {
+    return 'Por $name';
+  }
+
+  @override
+  String get packNoDescription => 'Sin descripción';
+
+  @override
+  String get packIsPublic => 'Este pack es público';
+
+  @override
+  String get packIsCodeOnly => 'Accesible por código';
+
+  @override
+  String get packShareSettings => 'Configurar compartido';
+
+  @override
+  String get packAlreadySaved => 'Ya está en tu sección Compartidos';
 }

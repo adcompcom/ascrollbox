@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../models/community_pack_model.dart';
 import '../models/pack_model.dart';
 import '../models/video_model.dart';
 import '../models/tag_model.dart';
 import '../services/firestore_service.dart';
 import '../services/metadata_service.dart';
+import '../services/storage_service.dart';
 import '../services/tag_classifier.dart';
 
 enum SortOrder { newest, oldest, byPlatform }
@@ -18,9 +20,14 @@ class AppProvider extends ChangeNotifier {
   StreamSubscription<List<VideoModel>>? _videosSub;
   StreamSubscription<List<PackModel>>? _packsSub;
   StreamSubscription<User?>? _authSub;
+  StreamSubscription<List<CommunityPackModel>>? _publicPacksSub;
+  StreamSubscription<List<String>>? _savedPackIdsSub;
 
-  List<VideoModel> videos = [];
+  List<VideoModel> _allVideos = [];
   List<PackModel> packs = [];
+  List<CommunityPackModel> publicCommunityPacks = [];
+  List<String> _savedCommunityPackIds = [];
+  List<CommunityPackModel> savedCommunityPacks = [];
   bool isLoading = false;
   String? pendingShareUrl;
   String _searchQuery = '';
@@ -38,6 +45,14 @@ class AppProvider extends ChangeNotifier {
     });
   }
 
+  // Public videos only — used everywhere except PrivateScreen
+  List<VideoModel> get videos =>
+      _allVideos.where((v) => !v.isPrivate).toList();
+
+  // Private videos only — used by PrivateScreen
+  List<VideoModel> get privateVideos =>
+      _allVideos.where((v) => v.isPrivate).toList();
+
   String get searchQuery => _searchQuery;
   Set<String> get filterTags => _filterTags;
   SortOrder get sortOrder => _sortOrder;
@@ -51,7 +66,7 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Tag → count of videos that have it, sorted descending by count.
+  /// Tag → count of public videos that have it, sorted descending by count.
   Map<String, int> get tagCounts {
     final counts = <String, int>{};
     for (final v in videos) {
@@ -84,7 +99,6 @@ class AppProvider extends ChangeNotifier {
         if (v.notes != null && v.notes!.toLowerCase().contains(q)) return true;
         return v.tags.any((t) {
           if (t.toLowerCase().contains(q)) return true;
-          // also check localized tag name
           if (_l10n != null) {
             return localizedTag(t, _l10n!).toLowerCase().contains(q);
           }
@@ -93,10 +107,8 @@ class AppProvider extends ChangeNotifier {
       }).toList();
     }
 
-    // Apply sort order
     switch (_sortOrder) {
       case SortOrder.newest:
-        // Firestore already returns newest first — no-op
         break;
       case SortOrder.oldest:
         result = result.reversed.toList();
@@ -136,11 +148,24 @@ class AppProvider extends ChangeNotifier {
 
   // ── Videos ────────────────────────────────────────────────────
 
-  Future<void> saveVideo(String uid, String url, List<String> tags) async {
+  Future<void> saveVideo(
+    String uid,
+    String url,
+    List<String> tags, {
+    bool isPrivate = false,
+  }) async {
     isLoading = true;
     notifyListeners();
     try {
       final meta = await _meta.fetch(url);
+
+      // Upload thumbnail to Firebase Storage for permanent hosting.
+      // Falls back to the original URL if upload fails.
+      final thumbnailUrl = meta.thumbnailUrl.isNotEmpty
+          ? (await StorageService().uploadThumbnail(uid, meta.thumbnailUrl) ??
+              meta.thumbnailUrl)
+          : '';
+
       await _db.addVideo(
         uid,
         VideoModel(
@@ -148,10 +173,11 @@ class AppProvider extends ChangeNotifier {
           url: url,
           platform: meta.platform,
           title: meta.title.isEmpty ? url : meta.title,
-          thumbnailUrl: meta.thumbnailUrl,
+          thumbnailUrl: thumbnailUrl,
           tags: tags,
           packIds: [],
           createdAt: DateTime.now(),
+          isPrivate: isPrivate,
         ),
       );
     } finally {
@@ -174,6 +200,12 @@ class AppProvider extends ChangeNotifier {
           String uid, VideoModel video, String? notes) =>
       _db.updateVideo(uid, video.copyWith(notes: notes));
 
+  Future<void> moveToPrivate(String uid, String videoId) =>
+      _db.updateVideoPrivacy(uid, videoId, true);
+
+  Future<void> moveToPublic(String uid, String videoId) =>
+      _db.updateVideoPrivacy(uid, videoId, false);
+
   /// Auto-suggests tags from title + description using TagClassifier.
   Future<List<String>> suggestTags(String url) async {
     try {
@@ -183,6 +215,78 @@ class AppProvider extends ChangeNotifier {
       return [];
     }
   }
+
+  // ── Community packs ───────────────────────────────────────────
+
+  bool isSavedCommunityPack(String communityPackId) =>
+      _savedCommunityPackIds.contains(communityPackId);
+
+  Future<String> publishPack({
+    required String uid,
+    required String packId,
+    required String ownerName,
+    required String? ownerPhotoUrl,
+    required String name,
+    required String description,
+    required List<String> tags,
+    required bool isPublic,
+    required List<VideoModel> videos,
+  }) =>
+      _db.publishPack(
+        uid: uid,
+        packId: packId,
+        ownerName: ownerName,
+        ownerPhotoUrl: ownerPhotoUrl,
+        name: name,
+        description: description,
+        tags: tags,
+        isPublic: isPublic,
+        videos: videos,
+      );
+
+  Future<void> unpublishPack(
+          String uid, String packId, String communityPackId) =>
+      _db.unpublishPack(uid, packId, communityPackId);
+
+  Future<void> saveCommunityPack(String uid, String communityPackId) =>
+      _db.saveCommunityPack(uid, communityPackId);
+
+  Future<void> unsaveCommunityPack(String uid, String communityPackId) =>
+      _db.unsaveCommunityPack(uid, communityPackId);
+
+  Future<CommunityPackModel?> findPackByCode(String code) =>
+      _db.findPackByCode(code);
+
+  Future<void> ratePack(String uid, String communityPackId, int rating) =>
+      _db.rateCommunityPack(uid, communityPackId, rating);
+
+  Future<int?> getUserRating(String uid, String communityPackId) =>
+      _db.getUserRating(uid, communityPackId);
+
+  Future<void> incrementViewCount(String communityPackId) =>
+      _db.incrementViewCount(communityPackId);
+
+  Stream<List<CommunityPackVideo>> communityPackVideos(String packId) =>
+      _db.watchCommunityPackVideos(packId);
+
+  Future<void> updatePackMeta(
+    String uid,
+    String packId, {
+    required String description,
+    required List<String> tags,
+  }) =>
+      _db.updatePackMeta(uid, packId, description: description, tags: tags);
+
+  // ── Private PIN ───────────────────────────────────────────────
+
+  Future<String?> getPrivatePinHash(String uid) =>
+      _db.getPrivatePinHash(uid);
+
+  Future<void> setPrivatePin(String uid, String pin) =>
+      _db.setPrivatePinHash(uid, pin);
+
+  bool verifyPrivatePin(String pin, String storedHash) =>
+      FirestoreService.verifyPin(pin, storedHash);
 
   // ── Packs ─────────────────────────────────────────────────────
 
@@ -210,12 +314,30 @@ class AppProvider extends ChangeNotifier {
   void _startListening(String uid) {
     _videosSub?.cancel();
     _packsSub?.cancel();
+    _publicPacksSub?.cancel();
+    _savedPackIdsSub?.cancel();
+
     _videosSub = _db.watchVideos(uid).listen((v) {
-      videos = v;
+      _allVideos = v;
       notifyListeners();
     });
     _packsSub = _db.watchPacks(uid).listen((p) {
       packs = p;
+      notifyListeners();
+    });
+    _publicPacksSub = _db.watchPublicCommunityPacks().handleError((_) {})
+        .listen((p) {
+      publicCommunityPacks = p;
+      notifyListeners();
+    });
+    _savedPackIdsSub = _db.watchSavedCommunityPackIds(uid).handleError((_) {})
+        .listen((ids) async {
+      _savedCommunityPackIds = ids;
+      // Fetch full data for each saved pack
+      final futures = ids.map((id) => _db.getCommunityPack(id));
+      final results = await Future.wait(futures);
+      savedCommunityPacks =
+          results.whereType<CommunityPackModel>().toList();
       notifyListeners();
     });
   }
@@ -223,8 +345,13 @@ class AppProvider extends ChangeNotifier {
   void _clear() {
     _videosSub?.cancel();
     _packsSub?.cancel();
-    videos = [];
+    _publicPacksSub?.cancel();
+    _savedPackIdsSub?.cancel();
+    _allVideos = [];
     packs = [];
+    publicCommunityPacks = [];
+    savedCommunityPacks = [];
+    _savedCommunityPackIds = [];
     notifyListeners();
   }
 
@@ -233,6 +360,8 @@ class AppProvider extends ChangeNotifier {
     _authSub?.cancel();
     _videosSub?.cancel();
     _packsSub?.cancel();
+    _publicPacksSub?.cancel();
+    _savedPackIdsSub?.cancel();
     super.dispose();
   }
 }

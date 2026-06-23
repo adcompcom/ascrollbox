@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import '../models/community_pack_model.dart';
+import '../models/user_profile_model.dart';
 import '../models/video_model.dart';
 import '../models/pack_model.dart';
 
@@ -18,6 +19,9 @@ class FirestoreService {
 
   DocumentReference<Map<String, dynamic>> _privateSettings(String uid) =>
       _db.collection('users').doc(uid).collection('settings').doc('private');
+
+  DocumentReference<Map<String, dynamic>> _profileDoc(String uid) =>
+      _db.collection('users').doc(uid).collection('settings').doc('profile');
 
   CollectionReference<Map<String, dynamic>> get _communityPacks =>
       _db.collection('community_packs');
@@ -391,4 +395,46 @@ class FirestoreService {
 
   static bool verifyAnswer(String answer, String storedHash) =>
       hashAnswer(answer) == storedHash;
+
+  // ── User profile ─────────────────────────────────────────────
+
+  CollectionReference<Map<String, dynamic>> get _nicknames =>
+      _db.collection('nicknames');
+
+  Stream<UserProfileModel?> watchProfile(String uid) =>
+      _profileDoc(uid).snapshots().map((doc) =>
+          doc.exists ? UserProfileModel.fromFirestore(doc) : null);
+
+  /// Saves the profile and atomically claims the new nickname.
+  /// Throws 'nickname_taken' if the nickname is already used by another user.
+  Future<void> saveProfile(
+    String uid,
+    UserProfileModel profile, {
+    String? oldNickname,
+  }) async {
+    final newNick = profile.nickname.trim().toLowerCase();
+    final oldNick = oldNickname?.trim().toLowerCase();
+
+    if (newNick.isNotEmpty && newNick != oldNick) {
+      // Atomic check-and-claim inside a transaction
+      await _db.runTransaction((tx) async {
+        final nicknameRef = _nicknames.doc(newNick);
+        final snap = await tx.get(nicknameRef);
+        if (snap.exists && snap.data()?['uid'] != uid) {
+          throw Exception('nickname_taken');
+        }
+        // Release old nickname
+        if (oldNick != null && oldNick.isNotEmpty && oldNick != newNick) {
+          tx.delete(_nicknames.doc(oldNick));
+        }
+        // Claim new nickname
+        tx.set(nicknameRef, {'uid': uid});
+      });
+    } else if (newNick.isEmpty && oldNick != null && oldNick.isNotEmpty) {
+      // User cleared their nickname — release it
+      await _nicknames.doc(oldNick).delete();
+    }
+
+    await _profileDoc(uid).set(profile.toFirestore(), SetOptions(merge: true));
+  }
 }

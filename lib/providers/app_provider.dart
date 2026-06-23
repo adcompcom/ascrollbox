@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/community_pack_model.dart';
 import '../models/pack_model.dart';
+import '../models/user_profile_model.dart';
 import '../models/video_model.dart';
 import '../models/tag_model.dart';
 import '../services/firestore_service.dart';
@@ -22,12 +23,14 @@ class AppProvider extends ChangeNotifier {
   StreamSubscription<User?>? _authSub;
   StreamSubscription<List<CommunityPackModel>>? _publicPacksSub;
   StreamSubscription<List<String>>? _savedPackIdsSub;
+  StreamSubscription<UserProfileModel?>? _profileSub;
 
   List<VideoModel> _allVideos = [];
   List<PackModel> packs = [];
   List<CommunityPackModel> publicCommunityPacks = [];
   List<String> _savedCommunityPackIds = [];
   List<CommunityPackModel> savedCommunityPacks = [];
+  UserProfileModel? userProfile;
   bool isLoading = false;
   String? pendingShareUrl;
   String _searchQuery = '';
@@ -216,6 +219,11 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  // ── User profile ─────────────────────────────────────────────
+
+  Future<void> saveProfile(String uid, UserProfileModel profile) =>
+      _db.saveProfile(uid, profile, oldNickname: userProfile?.nickname);
+
   // ── Community packs ───────────────────────────────────────────
 
   bool isSavedCommunityPack(String communityPackId) =>
@@ -325,6 +333,10 @@ class AppProvider extends ChangeNotifier {
       packs = p;
       notifyListeners();
     });
+    _profileSub = _db.watchProfile(uid).handleError((_) {}).listen((p) {
+      userProfile = p;
+      notifyListeners();
+    });
     _publicPacksSub = _db.watchPublicCommunityPacks().handleError((_) {})
         .listen((p) {
       publicCommunityPacks = p;
@@ -347,11 +359,13 @@ class AppProvider extends ChangeNotifier {
     _packsSub?.cancel();
     _publicPacksSub?.cancel();
     _savedPackIdsSub?.cancel();
+    _profileSub?.cancel();
     _allVideos = [];
     packs = [];
     publicCommunityPacks = [];
     savedCommunityPacks = [];
     _savedCommunityPackIds = [];
+    userProfile = null;
     notifyListeners();
   }
 
@@ -362,6 +376,7 @@ class AppProvider extends ChangeNotifier {
     _packsSub?.cancel();
     _publicPacksSub?.cancel();
     _savedPackIdsSub?.cancel();
+    _profileSub?.cancel();
     super.dispose();
   }
 }

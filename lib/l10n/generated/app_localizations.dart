@@ -1555,6 +1555,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Already in your Shared section'**
   String get packAlreadySaved;
+
+  /// No description provided for @settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settings;
+
+  /// No description provided for @profileSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profileSection;
+
+  /// No description provided for @nickname.
+  ///
+  /// In en, this message translates to:
+  /// **'Nickname'**
+  String get nickname;
+
+  /// No description provided for @nicknameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'How you appear in shared packs'**
+  String get nicknameHint;
+
+  /// No description provided for @changePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Change photo'**
+  String get changePhoto;
+
+  /// No description provided for @profileSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile saved'**
+  String get profileSaved;
+
+  /// No description provided for @privateSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Private section'**
+  String get privateSection;
+
+  /// No description provided for @changePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get changePin;
+
+  /// No description provided for @accountSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get accountSection;
+
+  /// No description provided for @nicknameTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This nickname is already taken'**
+  String get nicknameTaken;
+
+  /// No description provided for @nicknameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Only letters, numbers, dots and underscores allowed'**
+  String get nicknameInvalid;
 }
 
 class _AppLocalizationsDelegate

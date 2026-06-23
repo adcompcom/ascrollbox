@@ -45,11 +45,17 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
     final videos = provider.videosInPack(widget.pack);
 
     try {
+      final profile = provider.userProfile;
+      final ownerName = profile?.nickname.isNotEmpty == true
+          ? profile!.nickname
+          : user.displayName ?? 'Usuario';
+      final ownerPhotoUrl = profile?.photoUrl ?? user.photoURL;
+
       await provider.publishPack(
         uid: user.uid,
         packId: widget.pack.id,
-        ownerName: user.displayName ?? 'Usuario',
-        ownerPhotoUrl: user.photoURL,
+        ownerName: ownerName,
+        ownerPhotoUrl: ownerPhotoUrl,
         name: widget.pack.name,
         description: widget.pack.description,
         tags: widget.pack.tags,

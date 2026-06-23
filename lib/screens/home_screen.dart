@@ -17,6 +17,7 @@ import 'categories_screen.dart';
 import 'packs_screen.dart';
 import 'pin_entry_screen.dart';
 import 'private_screen.dart';
+import 'settings_screen.dart';
 import 'video_player_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -460,6 +461,12 @@ class _AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final profile = context.watch<AppProvider>().userProfile;
+    final displayName = profile?.nickname.isNotEmpty == true
+        ? profile!.nickname
+        : user.displayName ?? 'U';
+    final photoUrl = profile?.photoUrl ?? user.photoURL;
+
     return Drawer(
       child: Column(
         children: [
@@ -471,14 +478,13 @@ class _AppDrawer extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
             ),
-            accountName: Text(user.displayName ?? 'U'),
+            accountName: Text(displayName),
             accountEmail: Text(user.email ?? ''),
             currentAccountPicture: CircleAvatar(
-              backgroundImage: user.photoURL != null
-                  ? NetworkImage(user.photoURL!)
-                  : null,
-              child: user.photoURL == null
-                  ? Text((user.displayName ?? 'U')[0].toUpperCase(),
+              backgroundImage:
+                  photoUrl != null ? NetworkImage(photoUrl) : null,
+              child: photoUrl == null
+                  ? Text(displayName[0].toUpperCase(),
                       style: const TextStyle(fontSize: 22))
                   : null,
             ),
@@ -512,6 +518,18 @@ class _AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               onPrivateTap();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings_outlined),
+            title: Text(l10n.settings),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => SettingsScreen(user: user)),
+              );
             },
           ),
           const Divider(),

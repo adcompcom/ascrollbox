@@ -257,5 +257,17 @@
   "packIsPublic": "Este pack es público",
   "packIsCodeOnly": "Accesible por código",
   "packShareSettings": "Configurar compartido",
-  "packAlreadySaved": "Ya está en tu sección Compartidos"
+  "packAlreadySaved": "Ya está en tu sección Compartidos",
+
+  "settings": "Configuración",
+  "profileSection": "Perfil",
+  "nickname": "Nombre de usuario",
+  "nicknameHint": "Cómo apareces en packs compartidos",
+  "changePhoto": "Cambiar foto",
+  "profileSaved": "Perfil guardado",
+  "privateSection": "Sección privada",
+  "changePin": "Cambiar clave",
+  "accountSection": "Cuenta",
+  "nicknameTaken": "Este nombre de usuario ya está en uso",
+  "nicknameInvalid": "Solo letras, números, puntos y guiones bajos"
 }

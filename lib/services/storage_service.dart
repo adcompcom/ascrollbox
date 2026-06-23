@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -38,5 +40,17 @@ class StorageService {
     if (contentType.contains('webp')) return 'webp';
     if (contentType.contains('gif')) return 'gif';
     return 'jpg';
+  }
+
+  /// Uploads profile photo bytes and returns the permanent download URL.
+  Future<String?> uploadProfilePhoto(
+      String uid, Uint8List bytes, String contentType) async {
+    try {
+      final ref = _storage.ref('users/$uid/profile/avatar.jpg');
+      await ref.putData(bytes, SettableMetadata(contentType: contentType));
+      return await ref.getDownloadURL();
+    } catch (_) {
+      return null;
+    }
   }
 }

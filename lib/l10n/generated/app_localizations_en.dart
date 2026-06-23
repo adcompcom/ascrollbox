@@ -770,4 +770,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get packAlreadySaved => 'Already in your Shared section';
+
+  @override
+  String get settings => 'Settings';
+
+  @override
+  String get profileSection => 'Profile';
+
+  @override
+  String get nickname => 'Nickname';
+
+  @override
+  String get nicknameHint => 'How you appear in shared packs';
+
+  @override
+  String get changePhoto => 'Change photo';
+
+  @override
+  String get profileSaved => 'Profile saved';
+
+  @override
+  String get privateSection => 'Private section';
+
+  @override
+  String get changePin => 'Change PIN';
+
+  @override
+  String get accountSection => 'Account';
+
+  @override
+  String get nicknameTaken => 'This nickname is already taken';
+
+  @override
+  String get nicknameInvalid =>
+      'Only letters, numbers, dots and underscores allowed';
 }

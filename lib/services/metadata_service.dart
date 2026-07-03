@@ -6,12 +6,14 @@ class VideoMetadata {
   final String description;
   final String thumbnailUrl;
   final String platform;
+  final List<String> hashtags;
 
   const VideoMetadata({
     required this.title,
     required this.description,
     required this.thumbnailUrl,
     required this.platform,
+    this.hashtags = const [],
   });
 }
 
@@ -31,18 +33,54 @@ class MetadataService {
     final url = _normalizeUrl(rawUrl);
     final platform = detectPlatform(url);
 
+    final VideoMetadata meta;
     switch (platform) {
       case 'youtube':
-        return await _youtubeOEmbed(url) ?? _empty(url, platform);
+        meta = await _youtubeOEmbed(url) ?? _empty(url, platform);
+        break;
       case 'tiktok':
-        return await _tiktokOEmbed(url) ?? _empty(url, platform);
+        meta = await _tiktokOEmbed(url) ?? _empty(url, platform);
+        break;
       case 'facebook':
-        return await _facebookScrape(url) ?? _empty(url, platform);
+        meta = await _facebookScrape(url) ?? _empty(url, platform);
+        break;
       case 'instagram':
-        return await _instagramScrape(url) ?? _empty(url, platform);
+        meta = await _instagramScrape(url) ?? _empty(url, platform);
+        break;
       default:
-        return await _scrapeHtml(url, platform, ua: _browserUA);
+        meta = await _scrapeHtml(url, platform, ua: _browserUA);
     }
+    return _extractHashtags(meta);
+  }
+
+  // ── Hashtags ──────────────────────────────────────────────────
+
+  static final RegExp _hashtagPattern =
+      RegExp(r'#([\p{L}\p{N}_]+)', unicode: true);
+
+  /// Pulls #hashtags out of the title/description so they can be used
+  /// as tags, leaving the displayed text free of hashtag clutter.
+  VideoMetadata _extractHashtags(VideoMetadata meta) {
+    final hashtags = <String>{};
+    String strip(String text) => text
+        .replaceAllMapped(_hashtagPattern, (m) {
+          hashtags.add(m.group(1)!.toLowerCase());
+          return '';
+        })
+        .replaceAll(RegExp(r'\s{2,}'), ' ')
+        .trim();
+
+    final title = strip(meta.title);
+    final description = strip(meta.description);
+    if (hashtags.isEmpty) return meta;
+
+    return VideoMetadata(
+      title: title,
+      description: description,
+      thumbnailUrl: meta.thumbnailUrl,
+      platform: meta.platform,
+      hashtags: hashtags.toList(),
+    );
   }
 
   // ── YouTube oEmbed ────────────────────────────────────────────

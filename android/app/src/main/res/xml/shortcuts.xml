@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Declares Ascrollbox as a Direct Share target for plain-text
+         (URL) shares, so Android's native share sheet can rank and
+         surface it in the top row without waiting on usage history. -->
+    <share-target android:targetClass="com.ascrollbox.ascrollbox.ShareActivity">
+        <data android:mimeType="text/plain" />
+        <category android:name="com.ascrollbox.ascrollbox.category.SHARE_TARGET" />
+    </share-target>
+</shortcuts>

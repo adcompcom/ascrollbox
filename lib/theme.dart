@@ -213,5 +213,25 @@ ThemeData buildTheme() {
         borderRadius: BorderRadius.all(Radius.circular(12)),
       ),
     ),
+
+    // ── Switch ──────────────────────────────────────────────────
+    // outline == surfaceContainerHighest in this palette, so the M3
+    // default (unselected thumb = outline, track = surfaceContainerHighest)
+    // renders the thumb invisible against its own track. Give the
+    // unselected thumb a darker gray so it's visible.
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? Colors.white
+              : AppColors.textTertiary),
+      trackColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? AppColors.blue
+              : AppColors.bgTertiary),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? Colors.transparent
+              : AppColors.textSecondary),
+    ),
   );
 }

@@ -1,0 +1,11 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.ascrollbox.ascrollbox",
+    "sha256_cert_fingerprints": [
+      "20:7C:6A:4D:E8:7E:60:3F:21:2D:88:AA:EA:26:04:B4:7D:E9:E3:4E:D4:6A:B6:75:8C:94:7F:E6:04:41:22:78",
+      "52:95:C8:03:E1:AA:B2:6A:2F:70:18:C2:61:20:EB:FC:AC:21:38:93:3F:97:16:40:F7:A6:08:39:55:20:9F:80"
+    ]
+  }
+}]

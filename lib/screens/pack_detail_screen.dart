@@ -21,10 +21,9 @@ class PackDetailScreen extends StatelessWidget {
   Future<void> _showAddVideosSheet(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
     final provider = context.read<AppProvider>();
-    final allVideos = provider.videos;
     final alreadyIn = pack.videoIds.toSet();
     final available =
-        allVideos.where((v) => !alreadyIn.contains(v.id)).toList();
+        provider.videos.where((v) => !alreadyIn.contains(v.id)).toList();
 
     if (available.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -33,6 +32,9 @@ class PackDetailScreen extends StatelessWidget {
       return;
     }
 
+    // Capture messenger before async gap so it stays valid after sheet pop
+    final messenger = ScaffoldMessenger.of(context);
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -40,41 +42,17 @@ class PackDetailScreen extends StatelessWidget {
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => DraggableScrollableSheet(
         expand: false,
-        initialChildSize: 0.6,
-        maxChildSize: 0.9,
-        builder: (ctx, scroll) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(l10n.addVideosToPack,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-            Expanded(
-              child: ListView.builder(
-                controller: scroll,
-                itemCount: available.length,
-                itemBuilder: (_, i) {
-                  final v = available[i];
-                  return ListTile(
-                    leading: _thumb(v),
-                    title: Text(v.title,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(v.platform),
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      await provider.addVideoToPack(_uid, pack.id, v.id);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.videoAddedToPack)),
-                        );
-                      }
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
+        initialChildSize: 0.65,
+        maxChildSize: 0.95,
+        builder: (ctx, scroll) => _AddVideoSheet(
+          available: available,
+          uid: _uid,
+          packId: pack.id,
+          provider: provider,
+          scrollController: scroll,
+          onAdded: () => messenger.showSnackBar(
+            SnackBar(content: Text(l10n.videoAddedToPack)),
+          ),
         ),
       ),
     );
@@ -111,13 +89,6 @@ class PackDetailScreen extends StatelessWidget {
         );
       }
     }
-  }
-
-  Widget _thumb(VideoModel v) {
-    if (v.thumbnailUrl.isEmpty) {
-      return const CircleAvatar(child: Icon(Icons.ondemand_video));
-    }
-    return CircleAvatar(backgroundImage: NetworkImage(v.thumbnailUrl));
   }
 
   @override
@@ -253,6 +224,168 @@ class PackDetailScreen extends StatelessWidget {
         icon: const Icon(Icons.add),
         label: Text(l10n.addVideos),
       ),
+    );
+  }
+}
+
+// ── Add-video sheet with search ───────────────────────────────────────────────
+
+class _AddVideoSheet extends StatefulWidget {
+  final List<VideoModel> available;
+  final String uid;
+  final String packId;
+  final AppProvider provider;
+  final ScrollController scrollController;
+  final VoidCallback onAdded;
+
+  const _AddVideoSheet({
+    required this.available,
+    required this.uid,
+    required this.packId,
+    required this.provider,
+    required this.scrollController,
+    required this.onAdded,
+  });
+
+  @override
+  State<_AddVideoSheet> createState() => _AddVideoSheetState();
+}
+
+class _AddVideoSheetState extends State<_AddVideoSheet> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<VideoModel> get _filtered {
+    if (_query.isEmpty) return widget.available;
+    final q = _query.toLowerCase();
+    return widget.available.where((v) {
+      if (v.title.toLowerCase().contains(q)) return true;
+      if (v.platform.toLowerCase().contains(q)) return true;
+      return v.tags.any((t) => t.toLowerCase().contains(q));
+    }).toList();
+  }
+
+  Widget _thumb(VideoModel v) => v.thumbnailUrl.isEmpty
+      ? const CircleAvatar(child: Icon(Icons.ondemand_video))
+      : CircleAvatar(backgroundImage: NetworkImage(v.thumbnailUrl));
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final filtered = _filtered;
+
+    return Column(
+      children: [
+        // Drag handle
+        Center(
+          child: Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+
+        // Title
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: Text(
+            l10n.addVideosToPack,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ),
+
+        // Search bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: TextField(
+            controller: _searchCtrl,
+            autofocus: false,
+            decoration: InputDecoration(
+              hintText: l10n.searchHint,
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
+              suffixIcon: _query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _query = '');
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+            ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
+        ),
+
+        const Divider(height: 1),
+
+        // Results count hint when searching
+        if (_query.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${filtered.length} / ${widget.available.length}',
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              ),
+            ),
+          ),
+
+        // List
+        Expanded(
+          child: filtered.isEmpty
+              ? Center(
+                  child: Text(
+                    l10n.noResults,
+                    style: TextStyle(color: Colors.grey[500]),
+                  ),
+                )
+              : ListView.builder(
+                  controller: widget.scrollController,
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) {
+                    final v = filtered[i];
+                    return ListTile(
+                      leading: _thumb(v),
+                      title: Text(
+                        v.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(v.platform),
+                      trailing: const Icon(Icons.add_circle_outline,
+                          color: Colors.grey),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await widget.provider
+                            .addVideoToPack(widget.uid, widget.packId, v.id);
+                        widget.onAdded();
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

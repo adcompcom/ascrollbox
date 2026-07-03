@@ -11,7 +11,6 @@ import '../providers/app_provider.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/metadata_service.dart';
-import '../services/tag_classifier.dart';
 import '../widgets/video_card.dart';
 import 'categories_screen.dart';
 import 'packs_screen.dart';
@@ -38,29 +37,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Save dialog ───────────────────────────────────────────────
-
-  Future<void> _showSaveDialog(String url) async {
-    final provider = context.read<AppProvider>();
-    final l10n = AppLocalizations.of(context);
-    await showSaveSheet(
-      context,
-      url: url,
-      onSave: (tags, isPrivate) async {
-        Navigator.pop(context);
-        await provider.saveVideo(widget.user.uid, url, tags, isPrivate: isPrivate);
-        provider.setPendingShare(null);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.videoSaved)),
-          );
-        }
-      },
-      onCancel: () {
-        Navigator.pop(context);
-        provider.setPendingShare(null);
-      },
-    );
-  }
 
   Future<void> _moveToPrivate(VideoModel video) async {
     final l10n = AppLocalizations.of(context);
@@ -92,39 +68,6 @@ class _HomeScreenState extends State<HomeScreen> {
         MaterialPageRoute(builder: (_) => PrivateScreen(user: widget.user)),
       );
     }
-  }
-
-  Future<void> _showAddUrlDialog() async {
-    final l10n = AppLocalizations.of(context);
-    final controller = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.addVideoTitle),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: l10n.pasteUrlHint,
-            border: const OutlineInputBorder(),
-          ),
-          autofocus: true,
-          keyboardType: TextInputType.url,
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(l10n.cancel)),
-          FilledButton(
-            onPressed: () {
-              final url = controller.text.trim();
-              Navigator.pop(ctx);
-              if (url.isNotEmpty) _showSaveDialog(url);
-            },
-            child: Text(l10n.next),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _confirmDelete(VideoModel video) async {
@@ -290,16 +233,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          CircleAvatar(
-            radius: 16,
-            backgroundImage: widget.user.photoURL != null
-                ? NetworkImage(widget.user.photoURL!)
-                : null,
-            child: widget.user.photoURL == null
-                ? Text((widget.user.displayName ?? 'U')[0].toUpperCase())
-                : null,
-          ),
-          const SizedBox(width: 12),
         ],
       ),
       drawer: _AppDrawer(user: widget.user, onPrivateTap: _openPrivateSection),
@@ -349,10 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Stack(
               children: [
                 if (videos.isEmpty)
-                  _EmptyState(
-                    hasVideos: provider.videos.isNotEmpty,
-                    onAdd: _showAddUrlDialog,
-                  )
+                  _EmptyState(hasVideos: provider.videos.isNotEmpty)
                 else
                   GridView.builder(
                     padding: const EdgeInsets.all(12),
@@ -386,11 +316,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddUrlDialog,
-        icon: const Icon(Icons.add),
-        label: Text(l10n.addVideo),
       ),
     );
   }
@@ -551,43 +476,67 @@ class _AppDrawer extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final bool hasVideos;
-  final VoidCallback onAdd;
-  const _EmptyState({required this.hasVideos, required this.onAdd});
+  const _EmptyState({required this.hasVideos});
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+
+    // No videos saved at all — lead with a marketing pitch for the
+    // share-to-save flow instead of a manual "add" affordance.
+    if (!hasVideos) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ShaderMask(
+                shaderCallback: (bounds) => LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    const Color(0xFF9B6DFF),
+                  ],
+                ).createShader(bounds),
+                child: Text(
+                  l10n.noVideosSaved,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.2,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                l10n.sharePrompt,
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: Colors.grey[500], height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Filters/search produced no matches — keep the simple state.
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(hasVideos ? Icons.filter_list_off : Icons.video_library_outlined,
-              size: 72, color: Colors.grey[300]),
+          Icon(Icons.filter_list_off, size: 72, color: Colors.grey[300]),
           const SizedBox(height: 16),
           Text(
-            hasVideos ? l10n.noResults : l10n.noVideosSaved,
+            l10n.noResults,
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
                 ?.copyWith(color: Colors.grey[500]),
           ),
-          if (!hasVideos) ...[
-            const SizedBox(height: 8),
-            Text(
-              l10n.sharePrompt,
-              textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Colors.grey[400]),
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add),
-              label: Text(l10n.addByUrl),
-            ),
-          ],
         ],
       ),
     );
@@ -666,12 +615,11 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
   Future<void> _autoSuggest() async {
     try {
       final meta = await MetadataService().fetch(widget.url);
-      final suggestions =
-          TagClassifier.suggest(meta.title, meta.description, max: 3);
+      // Tags come straight from the creator's own #hashtags.
       if (mounted) {
         setState(() {
-          _suggested = suggestions;
-          for (final s in suggestions) {
+          _suggested = meta.hashtags;
+          for (final s in _suggested) {
             if (_selected.length < _maxTags) _selected.add(s);
           }
         });
@@ -713,116 +661,119 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
 
     return Column(
       children: [
-        Center(
-          child: Container(
-            margin: const EdgeInsets.only(top: 10, bottom: 4),
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.asset('assets/icon.png', width: 28, height: 28),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Ascrollbox',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(l10n.labelsTitle,
-                      style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(width: 8),
-                  if (_suggesting)
-                    const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                  else
-                    Text(l10n.labelsRemaining(remaining),
-                        style:
-                            TextStyle(fontSize: 11, color: Colors.grey[500])),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (_selected.isNotEmpty)
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: _selected.map((tag) {
-                    final emoji = kTagEmoji[tag] ?? '';
-                    final localizedName = tag.localized(context);
-                    return Chip(
-                      label: Text(
-                          '${emoji.isNotEmpty ? '$emoji ' : ''}$localizedName'),
-                      deleteIcon: const Icon(Icons.close, size: 14),
-                      onDeleted: () => _toggle(tag),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                    );
-                  }).toList(),
-                ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _customController,
-                      decoration: InputDecoration(
-                        hintText: l10n.labelsCustomPlaceholder,
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        isDense: true,
-                      ),
-                      onSubmitted: (_) => _addCustom(),
-                      textCapitalization: TextCapitalization.none,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _addCustom,
-                    icon: const Icon(Icons.add),
-                    style:
-                        IconButton.styleFrom(minimumSize: const Size(40, 40)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
         Expanded(
           child: ListView(
             controller: widget.scrollController,
-            padding: const EdgeInsets.only(bottom: 80),
+            padding: const EdgeInsets.only(bottom: 16),
             children: [
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 4),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.asset('assets/icon.png',
+                          width: 28, height: 28),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Ascrollbox',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(l10n.labelsTitle,
+                            style: Theme.of(context).textTheme.titleSmall),
+                        const SizedBox(width: 8),
+                        if (_suggesting)
+                          const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2))
+                        else
+                          Text(l10n.labelsRemaining(remaining),
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey[500])),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_selected.isNotEmpty)
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: _selected.map((tag) {
+                          final emoji = kTagEmoji[tag] ?? '';
+                          final localizedName = tag.localized(context);
+                          return Chip(
+                            label: Text(
+                                '${emoji.isNotEmpty ? '$emoji ' : ''}$localizedName'),
+                            deleteIcon: const Icon(Icons.close, size: 14),
+                            onDeleted: () => _toggle(tag),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _customController,
+                            decoration: InputDecoration(
+                              hintText: l10n.labelsCustomPlaceholder,
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              isDense: true,
+                            ),
+                            onSubmitted: (_) => _addCustom(),
+                            textCapitalization: TextCapitalization.none,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          onPressed: _addCustom,
+                          icon: const Icon(Icons.add),
+                          style: IconButton.styleFrom(
+                              minimumSize: const Size(40, 40)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
               if (_suggested.isNotEmpty)
                 _SectionTile(
-                  emoji: '✦',
+                  emoji: '#',
                   label: l10n.labelsSuggested,
                   tags: _suggested,
                   selected: _selected,
@@ -830,14 +781,6 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                   initiallyExpanded: true,
                   accentColor: Theme.of(context).colorScheme.primary,
                 ),
-              ...kTagSections.map((s) => _SectionTile(
-                    emoji: s.emoji,
-                    label: s.label(l10n),
-                    tags: s.tags.where((t) => !_suggested.contains(t)).toList(),
-                    selected: _selected,
-                    onToggle: _toggle,
-                    initiallyExpanded: false,
-                  )),
             ],
           ),
         ),
@@ -1019,115 +962,97 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title
-              Text(l10n.editVideo,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-
-              // Notes field
-              TextField(
-                controller: _notesController,
-                decoration: InputDecoration(
-                  labelText: l10n.notes,
-                  hintText: l10n.notesHint,
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                ),
-                maxLines: 3,
-                minLines: 1,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-              const SizedBox(height: 12),
-
-              // Tags header + counter
-              Row(
-                children: [
-                  Text(l10n.labelsTitle,
-                      style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(width: 8),
-                  Text(l10n.labelsRemaining(remaining),
-                      style:
-                          TextStyle(fontSize: 11, color: Colors.grey[500])),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Selected chips
-              if (_selected.isNotEmpty)
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: _selected.map((tag) {
-                    final emoji = kTagEmoji[tag] ?? '';
-                    final localizedName = tag.localized(context);
-                    return Chip(
-                      label: Text(
-                          '${emoji.isNotEmpty ? '$emoji ' : ''}$localizedName'),
-                      deleteIcon: const Icon(Icons.close, size: 14),
-                      onDeleted: () => _toggle(tag),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                    );
-                  }).toList(),
-                ),
-              const SizedBox(height: 8),
-
-              // Custom tag input
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _customController,
-                      decoration: InputDecoration(
-                        hintText: l10n.labelsCustomPlaceholder,
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        isDense: true,
-                      ),
-                      onSubmitted: (_) => _addCustom(),
-                      textCapitalization: TextCapitalization.none,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _addCustom,
-                    icon: const Icon(Icons.add),
-                    style:
-                        IconButton.styleFrom(minimumSize: const Size(40, 40)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-
-        const Divider(height: 1),
-
-        // Scrollable tag sections
         Expanded(
-          child: ListView(
+          child: SingleChildScrollView(
             controller: widget.scrollController,
-            padding: const EdgeInsets.only(bottom: 80),
-            children: kTagSections
-                .map((s) => _SectionTile(
-                      emoji: s.emoji,
-                      label: s.label(l10n),
-                      tags: s.tags,
-                      selected: _selected,
-                      onToggle: _toggle,
-                      initiallyExpanded: false,
-                    ))
-                .toList(),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                Text(l10n.editVideo,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+
+                // Notes field
+                TextField(
+                  controller: _notesController,
+                  decoration: InputDecoration(
+                    labelText: l10n.notes,
+                    hintText: l10n.notesHint,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  maxLines: 3,
+                  minLines: 1,
+                  textCapitalization: TextCapitalization.sentences,
+                ),
+                const SizedBox(height: 12),
+
+                // Tags header + counter
+                Row(
+                  children: [
+                    Text(l10n.labelsTitle,
+                        style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(width: 8),
+                    Text(l10n.labelsRemaining(remaining),
+                        style:
+                            TextStyle(fontSize: 11, color: Colors.grey[500])),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Selected chips
+                if (_selected.isNotEmpty)
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: _selected.map((tag) {
+                      final emoji = kTagEmoji[tag] ?? '';
+                      final localizedName = tag.localized(context);
+                      return Chip(
+                        label: Text(
+                            '${emoji.isNotEmpty ? '$emoji ' : ''}$localizedName'),
+                        deleteIcon: const Icon(Icons.close, size: 14),
+                        onDeleted: () => _toggle(tag),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      );
+                    }).toList(),
+                  ),
+                const SizedBox(height: 8),
+
+                // Custom tag input
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _customController,
+                        decoration: InputDecoration(
+                          hintText: l10n.labelsCustomPlaceholder,
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          isDense: true,
+                        ),
+                        onSubmitted: (_) => _addCustom(),
+                        textCapitalization: TextCapitalization.none,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      onPressed: _addCustom,
+                      icon: const Icon(Icons.add),
+                      style: IconButton.styleFrom(
+                          minimumSize: const Size(40, 40)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
 

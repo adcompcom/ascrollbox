@@ -11,17 +11,23 @@ import '../models/pack_model.dart';
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  // ── Path helpers ─────────────────────────────────────────────
+
+  /// Top-level user document — read by the admin panel.
+  DocumentReference<Map<String, dynamic>> _userDoc(String uid) =>
+      _db.collection('users').doc(uid);
+
   CollectionReference<Map<String, dynamic>> _videos(String uid) =>
-      _db.collection('users').doc(uid).collection('videos');
+      _userDoc(uid).collection('videos');
 
   CollectionReference<Map<String, dynamic>> _packs(String uid) =>
-      _db.collection('users').doc(uid).collection('packs');
+      _userDoc(uid).collection('packs');
 
   DocumentReference<Map<String, dynamic>> _privateSettings(String uid) =>
-      _db.collection('users').doc(uid).collection('settings').doc('private');
+      _userDoc(uid).collection('settings').doc('private');
 
   DocumentReference<Map<String, dynamic>> _profileDoc(String uid) =>
-      _db.collection('users').doc(uid).collection('settings').doc('profile');
+      _userDoc(uid).collection('settings').doc('profile');
 
   CollectionReference<Map<String, dynamic>> get _communityPacks =>
       _db.collection('community_packs');
@@ -33,7 +39,101 @@ class FirestoreService {
       _communityPacks.doc(cpId).collection('ratings');
 
   CollectionReference<Map<String, dynamic>> _savedPacks(String uid) =>
-      _db.collection('users').doc(uid).collection('saved_community_packs');
+      _userDoc(uid).collection('saved_community_packs');
+
+  CollectionReference<Map<String, dynamic>> get _auditLogs =>
+      _db.collection('audit_logs');
+
+  // ── Admin / Audit ────────────────────────────────────────────
+
+  /// Creates or updates the top-level users/{uid} document used by the admin
+  /// panel. Safe to call on every login — uses a transaction so createdAt is
+  /// only written once.
+  Future<void> upsertUserDocument(
+    String uid,
+    String email,
+    String displayName,
+    String platform,
+  ) async {
+    final ref = _userDoc(uid);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) {
+        tx.set(ref, {
+          'uid': uid,
+          'email': email,
+          'displayName': displayName,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLoginAt': FieldValue.serverTimestamp(),
+          'loginCount': 1,
+          'platform': platform,
+          'isActive': true,
+          'isBanned': false,
+          'role': 'user',
+          'videoCount': 0,
+          'packCount': 0,
+        });
+      } else {
+        tx.update(ref, {
+          'email': email,
+          'displayName': displayName,
+          'lastLoginAt': FieldValue.serverTimestamp(),
+          'loginCount': FieldValue.increment(1),
+          'platform': platform,
+        });
+      }
+    });
+  }
+
+  /// Appends a row to audit_logs for admin reporting.
+  ///
+  /// [action]     — e.g. 'video_added', 'video_deleted', 'pack_published'
+  /// [targetType] — 'video' | 'pack' | 'community_pack'
+  /// [targetId]   — document ID of the affected entity
+  /// [metadata]   — optional extra context (platform, title, etc.)
+  Future<void> writeAuditLog(
+    String uid,
+    String action,
+    String targetType,
+    String targetId, [
+    Map<String, dynamic>? metadata,
+  ]) =>
+      _auditLogs.add({
+        'uid': uid,
+        'action': action,
+        'targetType': targetType,
+        'targetId': targetId,
+        if (metadata != null) 'metadata': metadata,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> incrementUserVideoCount(String uid, int delta) =>
+      _userDoc(uid).update({'videoCount': FieldValue.increment(delta)});
+
+  Future<void> incrementUserPackCount(String uid, int delta) =>
+      _userDoc(uid).update({'packCount': FieldValue.increment(delta)});
+
+  /// Bumps viewCount and stamps lastViewedAt on a video document.
+  Future<void> recordVideoView(String uid, String videoId) =>
+      _videos(uid).doc(videoId).update({
+        'viewCount': FieldValue.increment(1),
+        'lastViewedAt': FieldValue.serverTimestamp(),
+      });
+
+  /// Admin soft-delete: marks a community pack as deleted without removing the
+  /// document, so the admin panel can audit it later.
+  Future<void> softDeleteCommunityPack(String communityPackId) =>
+      _communityPacks.doc(communityPackId).update({
+        'isDeleted': true,
+        'deletedAt': FieldValue.serverTimestamp(),
+      });
+
+  /// Increments reportCount and flags a community pack for moderation review.
+  Future<void> reportCommunityPack(String communityPackId) =>
+      _communityPacks.doc(communityPackId).update({
+        'reportCount': FieldValue.increment(1),
+        'isFlagged': true,
+      });
 
   // ── Videos ──────────────────────────────────────────────────
 
@@ -48,13 +148,41 @@ class FirestoreService {
   }
 
   Future<void> updateVideo(String uid, VideoModel video) =>
-      _videos(uid).doc(video.id).update(video.toFirestore());
+      _videos(uid).doc(video.id).update({
+        ...video.toFirestore(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-  Future<void> deleteVideo(String uid, String videoId) =>
-      _videos(uid).doc(videoId).delete();
+  Future<void> deleteVideo(String uid, String videoId) async {
+    final videoSnap = await _videos(uid).doc(videoId).get();
+    final packIds = List<String>.from(videoSnap.data()?['packIds'] ?? []);
 
-  Future<void> updateVideoPrivacy(String uid, String videoId, bool isPrivate) =>
-      _videos(uid).doc(videoId).update({'isPrivate': isPrivate});
+    final batch = _db.batch();
+    batch.delete(_videos(uid).doc(videoId));
+    for (final packId in packIds) {
+      batch.update(_packs(uid).doc(packId), {
+        'videoIds': FieldValue.arrayRemove([videoId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+
+    // Also drop the video from any community packs those packs are linked to.
+    for (final packId in packIds) {
+      final packSnap = await _packs(uid).doc(packId).get();
+      final communityPackId = packSnap.data()?['communityPackId'] as String?;
+      if (communityPackId != null) {
+        await _cpVideos(communityPackId).doc(videoId).delete();
+      }
+    }
+  }
+
+  Future<void> updateVideoPrivacy(
+          String uid, String videoId, bool isPrivate) =>
+      _videos(uid).doc(videoId).update({
+        'isPrivate': isPrivate,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
   // ── Packs (private) ──────────────────────────────────────────
 
@@ -104,12 +232,12 @@ class FirestoreService {
     for (final vid in videoIds) {
       batch.update(_videos(uid).doc(vid), {
         'packIds': FieldValue.arrayRemove([packId]),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     }
     batch.delete(_packs(uid).doc(packId));
     await batch.commit();
 
-    // Also remove from community if published
     if (communityPackId != null) {
       await _deleteCommunityPack(communityPackId);
     }
@@ -127,10 +255,10 @@ class FirestoreService {
       }),
       _videos(uid).doc(videoId).update({
         'packIds': FieldValue.arrayUnion([packId]),
+        'updatedAt': FieldValue.serverTimestamp(),
       }),
     ]);
 
-    // Sync to community pack if published
     if (communityPackId != null) {
       final videoSnap = await _videos(uid).doc(videoId).get();
       if (videoSnap.exists) {
@@ -160,6 +288,7 @@ class FirestoreService {
       }),
       _videos(uid).doc(videoId).update({
         'packIds': FieldValue.arrayRemove([packId]),
+        'updatedAt': FieldValue.serverTimestamp(),
       }),
     ]);
 
@@ -208,9 +337,13 @@ class FirestoreService {
       'ratingCount': 0,
       'createdAt': now,
       'updatedAt': now,
+      // moderation
+      'isDeleted': false,
+      'reportCount': 0,
+      'isFlagged': false,
+      'moderationStatus': 'pending',
     });
 
-    // Link back to user's pack
     batch.update(_packs(uid).doc(packId), {
       'communityPackId': cpRef.id,
       'description': description,
@@ -220,7 +353,6 @@ class FirestoreService {
 
     await batch.commit();
 
-    // Write video subcollection
     final videosBatch = _db.batch();
     for (final v in videos) {
       videosBatch.set(
@@ -251,7 +383,6 @@ class FirestoreService {
   }
 
   Future<void> _deleteCommunityPack(String communityPackId) async {
-    // Delete videos subcollection first
     final vSnap = await _cpVideos(communityPackId).get();
     final batch = _db.batch();
     for (final doc in vSnap.docs) {
@@ -266,7 +397,10 @@ class FirestoreService {
           .where('isPublic', isEqualTo: true)
           .snapshots()
           .map((s) {
-            final packs = s.docs.map(CommunityPackModel.fromFirestore).toList();
+            final packs = s.docs
+                .map(CommunityPackModel.fromFirestore)
+                .where((p) => !p.isDeleted)
+                .toList();
             packs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return packs;
           });
@@ -280,6 +414,7 @@ class FirestoreService {
   Future<CommunityPackModel?> findPackByCode(String code) async {
     final snap = await _communityPacks
         .where('shareCode', isEqualTo: code.toUpperCase())
+        .where('isDeleted', isEqualTo: false)
         .limit(1)
         .get();
     if (snap.docs.isEmpty) return null;
@@ -346,7 +481,8 @@ class FirestoreService {
           'ratingSum': FieldValue.increment(rating - existing),
         });
       }
-      tx.set(ratingRef, {'rating': rating, 'ratedAt': FieldValue.serverTimestamp()});
+      tx.set(ratingRef,
+          {'rating': rating, 'ratedAt': FieldValue.serverTimestamp()});
     });
   }
 
@@ -416,22 +552,18 @@ class FirestoreService {
     final oldNick = oldNickname?.trim().toLowerCase();
 
     if (newNick.isNotEmpty && newNick != oldNick) {
-      // Atomic check-and-claim inside a transaction
       await _db.runTransaction((tx) async {
         final nicknameRef = _nicknames.doc(newNick);
         final snap = await tx.get(nicknameRef);
         if (snap.exists && snap.data()?['uid'] != uid) {
           throw Exception('nickname_taken');
         }
-        // Release old nickname
         if (oldNick != null && oldNick.isNotEmpty && oldNick != newNick) {
           tx.delete(_nicknames.doc(oldNick));
         }
-        // Claim new nickname
         tx.set(nicknameRef, {'uid': uid});
       });
     } else if (newNick.isEmpty && oldNick != null && oldNick.isNotEmpty) {
-      // User cleared their nickname — release it
       await _nicknames.doc(oldNick).delete();
     }
 

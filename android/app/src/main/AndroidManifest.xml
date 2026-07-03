@@ -30,6 +30,32 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- App Links — https://ascrollbox.web.app/p/{CODE} opens this app -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="ascrollbox.web.app"
+                    android:pathPrefix="/p/"/>
+            </intent-filter>
+
+            <!-- Custom scheme — works from WhatsApp WebView and other in-app browsers
+                 that don't honor verified App Links -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="ascrollbox" android:host="pack"/>
+            </intent-filter>
+
+            <!-- Direct Share target declaration — lets Android's native
+                 share sheet rank/pin Ascrollbox without prior usage history -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts"/>
         </activity>
 
         <!-- Share receiver: transparent activity that shows a bottom sheet

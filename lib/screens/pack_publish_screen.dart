@@ -2,10 +2,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../l10n/generated/app_localizations.dart';
 import '../models/pack_model.dart';
 import '../providers/app_provider.dart';
+import '../services/firestore_service.dart';
 
 class PackPublishScreen extends StatefulWidget {
   final PackModel pack;
@@ -24,18 +26,43 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
   @override
   void initState() {
     super.initState();
-    _shareCode = _findShareCode();
+    _loadShareCode();
   }
 
-  String? _findShareCode() {
+  /// Loads share code from in-memory provider first (faster), then Firestore
+  /// as fallback so that code-only packs (not in publicCommunityPacks) also
+  /// show their share code and link correctly.
+  Future<void> _loadShareCode() async {
     final cpId = widget.pack.communityPackId;
-    if (cpId == null) return null;
-    final found = context
+    if (cpId == null) return;
+
+    // Check in-memory first (public packs are already loaded)
+    final inMemory = context
         .read<AppProvider>()
         .publicCommunityPacks
         .where((p) => p.id == cpId)
         .firstOrNull;
-    return found?.shareCode;
+
+    if (inMemory != null) {
+      if (mounted) {
+        setState(() {
+          _shareCode = inMemory.shareCode;
+          _isPublic = inMemory.isPublic;
+        });
+      }
+      return;
+    }
+
+    // Fetch from Firestore (covers code-only packs not in public stream)
+    try {
+      final cp = await FirestoreService().getCommunityPack(cpId);
+      if (mounted && cp != null) {
+        setState(() {
+          _shareCode = cp.shareCode;
+          _isPublic = cp.isPublic;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _publish() async {
@@ -62,12 +89,9 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
         isPublic: _isPublic,
         videos: videos,
       );
-      // Get share code from the freshly created community pack
+      // Reload share code after publish (small delay for Firestore propagation)
       await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        final code = _findShareCode();
-        setState(() => _shareCode = code);
-      }
+      if (mounted) await _loadShareCode();
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -111,7 +135,7 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final isPublished = widget.pack.isPublished;
-    final code = _shareCode ?? _findShareCode();
+    final code = _shareCode;
 
     return Scaffold(
       appBar: AppBar(
@@ -156,7 +180,7 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
 
                 // Share code (if already published)
                 if (code != null) ...[
-                  _ShareCodeCard(code: code),
+                  _ShareCodeCard(code: code, packName: widget.pack.name),
                   const SizedBox(height: 24),
                 ],
 
@@ -194,48 +218,114 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
 
 class _ShareCodeCard extends StatelessWidget {
   final String code;
-  const _ShareCodeCard({required this.code});
+  final String packName;
+
+  const _ShareCodeCard({required this.code, required this.packName});
+
+  static const _baseUrl = 'https://ascrollbox.web.app/p/';
+
+  String get _link => '$_baseUrl$code';
+
+  Future<void> _share() async {
+    await Share.share(
+      '🎬 Mira este pack en Ascrollbox: "$packName"\n\n$_link',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.share, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.packShareCode,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: theme.colorScheme.primary)),
-                Text(
-                  code,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 4,
-                    color: theme.colorScheme.primary,
-                  ),
+          // Code row
+          Row(
+            children: [
+              Icon(Icons.tag, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.packShareCode,
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: theme.colorScheme.primary)),
+                    Text(
+                      code,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 4,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy, size: 20),
+                tooltip: 'Copiar código',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: code));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.packShareCodeCopied)),
+                  );
+                },
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.copy),
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: code));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.packShareCodeCopied)),
-              );
-            },
+
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
+
+          // Link row
+          Row(
+            children: [
+              Icon(Icons.link, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _link,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    decoration: TextDecoration.underline,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy, size: 20),
+                tooltip: 'Copiar link',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: _link));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Link copiado')),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Share button
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _share,
+              icon: const Icon(Icons.share, size: 18),
+              label: const Text('Compartir por WhatsApp / más'),
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+              ),
+            ),
           ),
         ],
       ),

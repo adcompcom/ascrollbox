@@ -25,7 +25,7 @@ class PackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final thumbs = videos.take(4).toList();
-    final count = pack.videoIds.length;
+    final count = videos.length;
 
     return GestureDetector(
       onTap: onTap,

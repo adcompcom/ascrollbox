@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -11,6 +14,7 @@ import 'firebase_options.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'models/video_model.dart';
 import 'providers/app_provider.dart';
+import 'screens/community_pack_detail_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/firestore_service.dart';
@@ -130,12 +134,91 @@ class _SplashApp extends StatelessWidget {
   }
 }
 
-class App extends StatelessWidget {
+class App extends StatefulWidget {
   const App({super.key});
+
+  @override
+  State<App> createState() => _AppState();
+}
+
+class _AppState extends State<App> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  StreamSubscription<Uri>? _linkSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _initLinks();
+  }
+
+  Future<void> _initLinks() async {
+    final appLinks = AppLinks();
+
+    // Links received while the app is already running
+    _linkSub = appLinks.uriLinkStream.listen(_handleLink);
+
+    // Link that opened the app from a cold/warm start
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final initial = await appLinks.getInitialLink();
+      if (initial != null) _handleLink(initial);
+    });
+  }
+
+  void _handleLink(Uri uri) {
+    String? code;
+
+    if (uri.scheme == 'https' && uri.host == 'ascrollbox.web.app') {
+      // https://ascrollbox.web.app/p/A3K9F2  (App Link — Chrome / verified browsers)
+      final segments = uri.pathSegments;
+      if (segments.length >= 2 && segments[0] == 'p') {
+        code = segments[1];
+      }
+    } else if (uri.scheme == 'ascrollbox' && uri.host == 'pack') {
+      // ascrollbox://pack/A3K9F2  (custom scheme — WhatsApp WebView)
+      final segments = uri.pathSegments;
+      if (segments.isNotEmpty) code = segments[0];
+    }
+
+    if (code != null && code.isNotEmpty) {
+      _openPackByCode(code.toUpperCase());
+    }
+  }
+
+  Future<void> _openPackByCode(String code) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final pack = await FirestoreService().findPackByCode(code);
+      if (pack == null) return;
+
+      _navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => CommunityPackDetailScreen(pack: pack),
+        ),
+      );
+
+      // Auto-save to Compartidos when opened via a shared link,
+      // unless the user is the owner or already has it saved.
+      if (pack.ownerId == user.uid) return;
+      final ctx = _navigatorKey.currentContext;
+      if (ctx == null) return;
+      final provider = ctx.read<AppProvider>();
+      if (!provider.isSavedCommunityPack(pack.id)) {
+        await provider.saveCommunityPack(user.uid, pack.id);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _linkSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Ascrollbox',
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
@@ -147,6 +230,8 @@ class App extends StatelessWidget {
       supportedLocales: const [
         Locale('en'),
         Locale('es'),
+        Locale('de'),
+        Locale('pt'),
       ],
       theme: buildTheme(),
       home: StreamBuilder<User?>(
@@ -180,7 +265,12 @@ class _ShareApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('en'), Locale('es')],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('es'),
+        Locale('de'),
+        Locale('pt'),
+      ],
       home: const _ShareScreen(),
     );
   }
@@ -195,6 +285,7 @@ class _ShareScreen extends StatefulWidget {
 
 class _ShareScreenState extends State<_ShareScreen> {
   static const _channel = MethodChannel('ascrollbox/share');
+  bool _saving = false;
 
   @override
   void initState() {
@@ -225,6 +316,9 @@ class _ShareScreenState extends State<_ShareScreen> {
       onSave: (tags, isPrivate) {
         handled = true;
         Navigator.pop(context);
+        // Save keeps running after the sheet closes — show a spinner
+        // instead of a blank screen so it doesn't look frozen.
+        setState(() => _saving = true);
         _saveAndClose(user.uid, url, tags, isPrivate);
       },
       onCancel: () {
@@ -271,6 +365,33 @@ class _ShareScreenState extends State<_ShareScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(backgroundColor: Colors.transparent);
+    if (!_saving) return const Scaffold(backgroundColor: Colors.transparent);
+
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
+      backgroundColor: Colors.black26,
+      body: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+              const SizedBox(width: 14),
+              Text(l10n.saving,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

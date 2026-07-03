@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/community_pack_model.dart';
 import '../models/pack_model.dart';
@@ -10,7 +12,6 @@ import '../models/tag_model.dart';
 import '../services/firestore_service.dart';
 import '../services/metadata_service.dart';
 import '../services/storage_service.dart';
-import '../services/tag_classifier.dart';
 
 enum SortOrder { newest, oldest, byPlatform }
 
@@ -32,7 +33,6 @@ class AppProvider extends ChangeNotifier {
   List<CommunityPackModel> savedCommunityPacks = [];
   UserProfileModel? userProfile;
   bool isLoading = false;
-  String? pendingShareUrl;
   String _searchQuery = '';
   Set<String> _filterTags = {};
   SortOrder _sortOrder = SortOrder.newest;
@@ -41,7 +41,7 @@ class AppProvider extends ChangeNotifier {
   AppProvider() {
     _authSub = FirebaseAuth.instance.userChanges().listen((user) {
       if (user != null) {
-        _startListening(user.uid);
+        _startListening(user);
       } else {
         _clear();
       }
@@ -88,7 +88,6 @@ class AppProvider extends ChangeNotifier {
   List<VideoModel> get filteredVideos {
     var result = videos;
 
-    // OR filter: video must have at least one of the selected tags
     if (_filterTags.isNotEmpty) {
       result = result
           .where((v) => v.tags.any((t) => _filterTags.contains(t)))
@@ -144,11 +143,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setPendingShare(String? url) {
-    pendingShareUrl = url;
-    notifyListeners();
-  }
-
   // ── Videos ────────────────────────────────────────────────────
 
   Future<void> saveVideo(
@@ -156,20 +150,19 @@ class AppProvider extends ChangeNotifier {
     String url,
     List<String> tags, {
     bool isPrivate = false,
+    String source = 'url_input',
   }) async {
     isLoading = true;
     notifyListeners();
     try {
       final meta = await _meta.fetch(url);
 
-      // Upload thumbnail to Firebase Storage for permanent hosting.
-      // Falls back to the original URL if upload fails.
       final thumbnailUrl = meta.thumbnailUrl.isNotEmpty
           ? (await StorageService().uploadThumbnail(uid, meta.thumbnailUrl) ??
               meta.thumbnailUrl)
           : '';
 
-      await _db.addVideo(
+      final videoId = await _db.addVideo(
         uid,
         VideoModel(
           id: '',
@@ -181,16 +174,31 @@ class AppProvider extends ChangeNotifier {
           packIds: [],
           createdAt: DateTime.now(),
           isPrivate: isPrivate,
+          source: source,
+          viewCount: 0,
         ),
       );
+
+      // Non-blocking audit writes — failures must not surface to the user
+      _db
+          .writeAuditLog(uid, 'video_added', 'video', videoId, {
+            'platform': meta.platform,
+            'isPrivate': isPrivate,
+            'source': source,
+          })
+          .ignore();
+      _db.incrementUserVideoCount(uid, 1).ignore();
     } finally {
       isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> deleteVideo(String uid, String videoId) =>
-      _db.deleteVideo(uid, videoId);
+  Future<void> deleteVideo(String uid, String videoId) async {
+    await _db.deleteVideo(uid, videoId);
+    _db.writeAuditLog(uid, 'video_deleted', 'video', videoId).ignore();
+    _db.incrementUserVideoCount(uid, -1).ignore();
+  }
 
   Future<void> updateVideo(String uid, VideoModel video) =>
       _db.updateVideo(uid, video);
@@ -209,14 +217,9 @@ class AppProvider extends ChangeNotifier {
   Future<void> moveToPublic(String uid, String videoId) =>
       _db.updateVideoPrivacy(uid, videoId, false);
 
-  /// Auto-suggests tags from title + description using TagClassifier.
-  Future<List<String>> suggestTags(String url) async {
-    try {
-      final meta = await _meta.fetch(url);
-      return TagClassifier.suggest(meta.title, meta.description);
-    } catch (_) {
-      return [];
-    }
+  /// Records that the user opened a video — updates viewCount + lastViewedAt.
+  Future<void> recordVideoView(String uid, String videoId) async {
+    _db.recordVideoView(uid, videoId).ignore();
   }
 
   // ── User profile ─────────────────────────────────────────────
@@ -239,22 +242,33 @@ class AppProvider extends ChangeNotifier {
     required List<String> tags,
     required bool isPublic,
     required List<VideoModel> videos,
-  }) =>
-      _db.publishPack(
-        uid: uid,
-        packId: packId,
-        ownerName: ownerName,
-        ownerPhotoUrl: ownerPhotoUrl,
-        name: name,
-        description: description,
-        tags: tags,
-        isPublic: isPublic,
-        videos: videos,
-      );
+  }) async {
+    final cpId = await _db.publishPack(
+      uid: uid,
+      packId: packId,
+      ownerName: ownerName,
+      ownerPhotoUrl: ownerPhotoUrl,
+      name: name,
+      description: description,
+      tags: tags,
+      isPublic: isPublic,
+      videos: videos,
+    );
+    _db
+        .writeAuditLog(uid, 'pack_published', 'community_pack', cpId,
+            {'name': name, 'isPublic': isPublic})
+        .ignore();
+    return cpId;
+  }
 
   Future<void> unpublishPack(
-          String uid, String packId, String communityPackId) =>
-      _db.unpublishPack(uid, packId, communityPackId);
+      String uid, String packId, String communityPackId) async {
+    await _db.unpublishPack(uid, packId, communityPackId);
+    _db
+        .writeAuditLog(
+            uid, 'pack_unpublished', 'community_pack', communityPackId)
+        .ignore();
+  }
 
   Future<void> saveCommunityPack(String uid, String communityPackId) =>
       _db.saveCommunityPack(uid, communityPackId);
@@ -298,14 +312,19 @@ class AppProvider extends ChangeNotifier {
 
   // ── Packs ─────────────────────────────────────────────────────
 
-  Future<void> createPack(String uid, String name) =>
-      _db.createPack(uid, name);
+  Future<void> createPack(String uid, String name) async {
+    await _db.createPack(uid, name);
+    _db.incrementUserPackCount(uid, 1).ignore();
+  }
 
   Future<void> renamePack(String uid, String packId, String name) =>
       _db.renamePack(uid, packId, name);
 
-  Future<void> deletePack(String uid, String packId) =>
-      _db.deletePack(uid, packId);
+  Future<void> deletePack(String uid, String packId) async {
+    await _db.deletePack(uid, packId);
+    _db.writeAuditLog(uid, 'pack_deleted', 'pack', packId).ignore();
+    _db.incrementUserPackCount(uid, -1).ignore();
+  }
 
   Future<void> addVideoToPack(String uid, String packId, String videoId) =>
       _db.addVideoToPack(uid, packId, videoId);
@@ -319,33 +338,51 @@ class AppProvider extends ChangeNotifier {
 
   // ── Internal ─────────────────────────────────────────────────
 
-  void _startListening(String uid) {
+  String get _currentPlatform {
+    if (kIsWeb) return 'web';
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isIOS) return 'ios';
+    if (Platform.isWindows) return 'windows';
+    return 'unknown';
+  }
+
+  void _startListening(User user) {
     _videosSub?.cancel();
     _packsSub?.cancel();
     _publicPacksSub?.cancel();
     _savedPackIdsSub?.cancel();
 
-    _videosSub = _db.watchVideos(uid).listen((v) {
+    // Non-blocking — failures must not break auth flow
+    _db
+        .upsertUserDocument(
+          user.uid,
+          user.email ?? '',
+          user.displayName ?? '',
+          _currentPlatform,
+        )
+        .ignore();
+
+    _videosSub = _db.watchVideos(user.uid).listen((v) {
       _allVideos = v;
       notifyListeners();
     });
-    _packsSub = _db.watchPacks(uid).listen((p) {
+    _packsSub = _db.watchPacks(user.uid).listen((p) {
       packs = p;
       notifyListeners();
     });
-    _profileSub = _db.watchProfile(uid).handleError((_) {}).listen((p) {
+    _profileSub = _db.watchProfile(user.uid).handleError((_) {}).listen((p) {
       userProfile = p;
       notifyListeners();
     });
-    _publicPacksSub = _db.watchPublicCommunityPacks().handleError((_) {})
-        .listen((p) {
+    _publicPacksSub =
+        _db.watchPublicCommunityPacks().handleError((_) {}).listen((p) {
       publicCommunityPacks = p;
       notifyListeners();
     });
-    _savedPackIdsSub = _db.watchSavedCommunityPackIds(uid).handleError((_) {})
-        .listen((ids) async {
+    _savedPackIdsSub =
+        _db.watchSavedCommunityPackIds(user.uid).handleError((_) {}).listen(
+            (ids) async {
       _savedCommunityPackIds = ids;
-      // Fetch full data for each saved pack
       final futures = ids.map((id) => _db.getCommunityPack(id));
       final results = await Future.wait(futures);
       savedCommunityPacks =

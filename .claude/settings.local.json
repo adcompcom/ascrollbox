@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir -p /home/daniel/workspace/ascrollbox/lib/models /home/daniel/workspace/ascrollbox/lib/services /home/daniel/workspace/ascrollbox/lib/providers /home/daniel/workspace/ascrollbox/lib/widgets)"
+      "Bash(mkdir -p /home/daniel/workspace/ascrollbox/lib/models /home/daniel/workspace/ascrollbox/lib/services /home/daniel/workspace/ascrollbox/lib/providers /home/daniel/workspace/ascrollbox/lib/widgets)",
+      "PowerShell(keytool -list -v -keystore \"$env:USERPROFILE\\\\.android\\\\debug.keystore\" -alias androiddebugkey -storepass android -keypass android 2>&1 | Select-String \"SHA256\")",
+      "Bash(curl -s https://ascrollbox.web.app/.well-known/assetlinks.json)",
+      "Bash(adb shell *)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" shell pm get-app-links com.ascrollbox.ascrollbox 2>&1)",
+      "PowerShell($storePass = \\(Get-Content \"d:\\\\workspace\\\\ascrollbox\\\\android\\\\key.properties\" | Where-Object { $_ -match \"^storePassword=\" }\\) -replace \"^storePassword=\",\"\"; & \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\\\\bin\\\\keytool.exe\" -list -v -keystore \"d:\\\\workspace\\\\ascrollbox\\\\ascrollbox-release.jks\" -alias ascrollbox -storepass $storePass 2>&1 | Select-String \"SHA256\")",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)"
     ],
     "additionalDirectories": [
       "/home/daniel/workspace/ascrollbox/lib"

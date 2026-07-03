@@ -5,8 +5,10 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
+import 'app_localizations_de.dart';
 import 'app_localizations_en.dart';
 import 'app_localizations_es.dart';
+import 'app_localizations_pt.dart';
 
 // ignore_for_file: type=lint
 
@@ -94,8 +96,10 @@ abstract class AppLocalizations {
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
+    Locale('de'),
     Locale('en'),
     Locale('es'),
+    Locale('pt'),
   ];
 
   /// Application name
@@ -164,6 +168,12 @@ abstract class AppLocalizations {
   /// **'Confirm'**
   String get confirm;
 
+  /// No description provided for @saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get saving;
+
   /// No description provided for @loginTagline.
   ///
   /// In en, this message translates to:
@@ -212,53 +222,23 @@ abstract class AppLocalizations {
   /// **'Search videos…'**
   String get searchHint;
 
-  /// No description provided for @addVideo.
-  ///
-  /// In en, this message translates to:
-  /// **'Add'**
-  String get addVideo;
-
-  /// No description provided for @addVideoTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Add video'**
-  String get addVideoTitle;
-
-  /// No description provided for @pasteUrlHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Paste the URL here'**
-  String get pasteUrlHint;
-
   /// No description provided for @noVideosSaved.
   ///
   /// In en, this message translates to:
-  /// **'You have no saved videos'**
+  /// **'Never lose a video again! 🎬'**
   String get noVideosSaved;
 
   /// No description provided for @sharePrompt.
   ///
   /// In en, this message translates to:
-  /// **'Share a video from YouTube,\nTikTok, Instagram or Facebook'**
+  /// **'Open your favorite apps, tap Share and pick Ascrollbox.\nSave them here — always a tap away.'**
   String get sharePrompt;
-
-  /// No description provided for @addByUrl.
-  ///
-  /// In en, this message translates to:
-  /// **'Add by URL'**
-  String get addByUrl;
 
   /// No description provided for @noResults.
   ///
   /// In en, this message translates to:
   /// **'No results'**
   String get noResults;
-
-  /// No description provided for @videoSaved.
-  ///
-  /// In en, this message translates to:
-  /// **'Video saved'**
-  String get videoSaved;
 
   /// No description provided for @deleteVideo.
   ///
@@ -1634,7 +1614,7 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en', 'es'].contains(locale.languageCode);
+      <String>['de', 'en', 'es', 'pt'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -1643,10 +1623,14 @@ class _AppLocalizationsDelegate
 AppLocalizations lookupAppLocalizations(Locale locale) {
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
+    case 'de':
+      return AppLocalizationsDe();
     case 'en':
       return AppLocalizationsEn();
     case 'es':
       return AppLocalizationsEs();
+    case 'pt':
+      return AppLocalizationsPt();
   }
 
   throw FlutterError(

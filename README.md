@@ -14,7 +14,7 @@ A Flutter app for saving and organizing social media videos from YouTube, TikTok
 - **Tag filter bar** — filter the video grid by one or more tags (OR logic)
 - **Full-text search** — searches title, notes, and both English and localized tag names
 - **Sort** — newest first, oldest first, or grouped by platform
-- **Packs** — curated collections with name, description, and tags set at creation. Add any video to one or more packs.
+- **Packs** — curated collections with name, description, and tags set at creation. Add any video to one or more packs. The "Add videos" sheet includes a live search bar that filters by title, platform, and tags, with a results counter.
 - **Community sharing** — publish any pack to the community (public or code-only). Other users can discover via a 6-char code, rate (1–5 stars), and save shared packs. Each pack tracks views, saves, and average rating.
 - **Edit** — update tags and personal notes on any saved video
 - **In-app player** — opens videos in a WebView without leaving the app
@@ -23,6 +23,8 @@ A Flutter app for saving and organizing social media videos from YouTube, TikTok
 - **Bilingual** — English and Spanish, using Flutter's official `l10n` system
 - **Material 3 theming** — purple accent, adaptive icon for Android
 - **Private section** — PIN-protected vault that hides videos from home, search, and every other view. Videos can be moved in/out freely. PIN recoverable via 3 security questions.
+- **User profile** — set a unique nickname and profile photo (stored in Firebase Storage). Photo and nickname appear in community packs.
+- **Admin-ready audit layer** — every login, video save/delete, and pack publish/unpublish is recorded in `audit_logs`. A top-level `users/{uid}` document tracks loginCount, lastLoginAt, platform, videoCount, packCount, isActive, isBanned, and role for the future admin panel.
 
 ## Architecture
 
@@ -34,11 +36,18 @@ lib/
 ├── firebase_options.dart     # Auto-generated Firebase config
 │
 ├── models/
-│   ├── video_model.dart      # VideoModel (url, platform, title, thumbnailUrl,
-│   │                         #   tags, notes, packIds, createdAt, isPrivate)
+│   ├── video_model.dart      # VideoModel (url, platform, title, thumbnailUrl, tags,
+│   │                         #   notes, packIds, createdAt, updatedAt, isPrivate,
+│   │                         #   source, viewCount, lastViewedAt)
 │   ├── pack_model.dart       # PackModel (name, description, tags, videoIds,
 │   │                         #   communityPackId, createdAt, updatedAt)
 │   ├── community_pack_model.dart # CommunityPackModel + CommunityPackVideo
+│   │                         #   (includes moderation fields: moderationStatus,
+│   │                         #   reportCount, isFlagged, isDeleted, deletedAt)
+│   ├── user_document_model.dart  # Top-level user doc for admin panel
+│   │                         #   (email, loginCount, lastLoginAt, platform,
+│   │                         #    isActive, isBanned, role, videoCount, packCount)
+│   ├── user_profile_model.dart   # Public profile (nickname, photoUrl)
 │   ├── category_model.dart   # CategoryModel (used in categories view)
 │   ├── tag_model.dart        # Tag keys, emoji map, section definitions, localization helpers
 │   └── security_question_model.dart # Predefined security questions with IDs
@@ -51,8 +60,10 @@ lib/
 ├── services/
 │   ├── auth_service.dart     # Google Sign-In / sign-out
 │   ├── firestore_service.dart# Firestore CRUD + real-time streams; PIN hash (SHA-256);
-│   │                         #   community pack publish/unpublish/rating/views
-│   ├── storage_service.dart  # Firebase Storage — downloads and re-uploads thumbnails
+│   │                         #   community pack publish/unpublish/rating/views;
+│   │                         #   upsertUserDocument, writeAuditLog, recordVideoView,
+│   │                         #   softDeleteCommunityPack, reportCommunityPack
+│   ├── storage_service.dart  # Firebase Storage — thumbnails + profile photos
 │   ├── metadata_service.dart # URL metadata fetching (oEmbed + HTML scraping)
 │   ├── tag_classifier.dart   # Keyword-based tag suggestion from title/description
 │   └── category_classifier.dart
@@ -214,13 +225,37 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isAuth() { return request.auth != null; }
     function isOwner(uid) { return request.auth.uid == uid; }
+    function isAdmin() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid))
+          .data.role in ['admin', 'moderator'];
+    }
     function isCommunityPackOwner(packId) {
       return get(/databases/$(database)/documents/community_packs/$(packId))
                .data.ownerId == request.auth.uid;
     }
 
+    // Top-level user doc — readable/writable by owner; readable by admins
+    match /users/{uid} {
+      allow read: if isAuth() && (isOwner(uid) || isAdmin());
+      allow write: if isAuth() && isOwner(uid);
+    }
+
+    // Subcollections remain owner-only
     match /users/{uid}/{document=**} {
       allow read, write: if isAuth() && isOwner(uid);
+    }
+
+    // Audit log — append-only for authenticated users, read by admins
+    match /audit_logs/{logId} {
+      allow create: if isAuth();
+      allow read: if isAdmin();
+    }
+
+    // Nickname index — any auth user can read; write managed by transactions
+    match /nicknames/{nick} {
+      allow read: if isAuth();
+      allow write: if isAuth();
     }
 
     match /community_packs/{packId} {
@@ -228,10 +263,13 @@ service cloud.firestore {
       allow create: if isAuth() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isAuth() && (
         resource.data.ownerId == request.auth.uid ||
+        isAdmin() ||
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['viewCount', 'shareCount', 'ratingSum', 'ratingCount'])
+          .hasOnly(['viewCount', 'shareCount', 'ratingSum', 'ratingCount',
+                    'reportCount', 'isFlagged'])
       );
-      allow delete: if isAuth() && resource.data.ownerId == request.auth.uid;
+      allow delete: if isAuth() &&
+        (resource.data.ownerId == request.auth.uid || isAdmin());
 
       match /videos/{videoId} {
         allow read: if isAuth();
@@ -270,6 +308,20 @@ service firebase.storage {
 
 ```
 users/{uid}/
+users/{uid}                   # Top-level user doc (admin panel)
+  uid           String
+  email         String
+  displayName   String
+  createdAt     Timestamp     # first login
+  lastLoginAt   Timestamp     # updated on every login
+  loginCount    Number
+  platform      String        # android | ios | web | windows
+  isActive      Boolean       # admin can deactivate
+  isBanned      Boolean       # admin can ban
+  role          String        # user | admin | moderator
+  videoCount    Number        # denormalized
+  packCount     Number        # denormalized
+
   videos/{videoId}
     url           String
     platform      String      # youtube | tiktok | instagram | facebook | other
@@ -279,7 +331,11 @@ users/{uid}/
     notes         String?
     packIds       List<String>
     createdAt     Timestamp
+    updatedAt     Timestamp?  # stamped on every edit
     isPrivate     Boolean     # true = hidden from home/search/packs/categories
+    source        String      # url_input | share_intent
+    viewCount     Number      # times user opened the in-app player
+    lastViewedAt  Timestamp?
 
   packs/{packId}
     name            String
@@ -293,6 +349,10 @@ users/{uid}/
   settings/private
     pinHash             String      # SHA-256 hash of the 6-digit PIN
     securityQuestions   List<Map>   # [{questionId, answerHash}] × 3
+
+  settings/profile
+    nickname      String      # unique across all users
+    photoUrl      String?     # Firebase Storage URL
 
   saved_community_packs/{communityPackId}
     savedAt       Timestamp
@@ -309,6 +369,12 @@ community_packs/{packId}
   ratingSum     Number
   ratingCount   Number        # avg = ratingSum / ratingCount
   createdAt, updatedAt
+  # Moderation (admin panel)
+  isDeleted       Boolean     # soft-delete — document kept for audit
+  deletedAt       Timestamp?
+  reportCount     Number      # times reported by users
+  isFlagged       Boolean     # admin-flagged for review
+  moderationStatus String     # pending | approved | rejected
 
   videos/{videoId}            # Live snapshot of video metadata
     url, platform, title, thumbnailUrl
@@ -316,6 +382,18 @@ community_packs/{packId}
   ratings/{uid}
     rating      Number (1–5)
     ratedAt     Timestamp
+
+nicknames/{nickname_lowercase}
+  uid           String        # ownership index for uniqueness checks
+
+audit_logs/{logId}            # Append-only audit trail for admin panel
+  uid           String
+  action        String        # video_added | video_deleted | pack_published |
+                              #   pack_unpublished | pack_deleted
+  targetType    String        # video | pack | community_pack
+  targetId      String
+  metadata      Map?          # extra context (platform, isPrivate, etc.)
+  createdAt     Timestamp
 ```
 
 ## Tag System

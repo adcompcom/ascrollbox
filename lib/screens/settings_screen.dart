@@ -24,6 +24,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _nicknameCtrl;
   Uint8List? _pendingPhotoBytes;
+  String? _savedPhotoUrl;
   bool _saving = false;
 
   @override
@@ -44,8 +45,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String? get _currentPhotoUrl {
     if (_pendingPhotoBytes != null) return null;
-    final profile = context.read<AppProvider>().userProfile;
-    return profile?.photoUrl ?? widget.user.photoURL;
+    return _savedPhotoUrl
+        ?? context.read<AppProvider>().userProfile?.photoUrl
+        ?? widget.user.photoURL;
   }
 
   Future<void> _pickPhoto() async {
@@ -89,8 +91,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           pendingBytes,
           'image/jpeg',
         );
+      } else {
+        photoUrl = existingPhotoUrl;
       }
-      photoUrl ??= existingPhotoUrl;
 
       await provider.saveProfile(
         widget.user.uid,
@@ -98,7 +101,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
 
       if (mounted) {
-        setState(() => _pendingPhotoBytes = null);
+        setState(() {
+          _pendingPhotoBytes = null;
+          _savedPhotoUrl = photoUrl;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.profileSaved)),
         );

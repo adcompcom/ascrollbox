@@ -42,6 +42,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get confirm => 'Confirmar';
 
   @override
+  String get saving => 'Guardando…';
+
+  @override
   String get loginTagline => 'Guarda y organiza tus videos favoritos';
 
   @override
@@ -68,29 +71,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String get searchHint => 'Buscar videos…';
 
   @override
-  String get addVideo => 'Agregar';
-
-  @override
-  String get addVideoTitle => 'Agregar video';
-
-  @override
-  String get pasteUrlHint => 'Pega el URL aquí';
-
-  @override
-  String get noVideosSaved => 'No tienes videos guardados';
+  String get noVideosSaved => '¡Nunca más pierdas un video! 🎬';
 
   @override
   String get sharePrompt =>
-      'Comparte un video desde YouTube,\nTikTok, Instagram o Facebook';
-
-  @override
-  String get addByUrl => 'Agregar por URL';
+      'Abre tus redes favoritas, toca Compartir y elige Ascrollbox.\nGuárdalos aquí y tenlos siempre a un toque de distancia.';
 
   @override
   String get noResults => 'Sin resultados';
-
-  @override
-  String get videoSaved => 'Video guardado';
 
   @override
   String get deleteVideo => 'Eliminar video';

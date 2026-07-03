@@ -42,6 +42,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirm => 'Confirm';
 
   @override
+  String get saving => 'Saving…';
+
+  @override
   String get loginTagline => 'Save and organize your favorite videos';
 
   @override
@@ -68,29 +71,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchHint => 'Search videos…';
 
   @override
-  String get addVideo => 'Add';
-
-  @override
-  String get addVideoTitle => 'Add video';
-
-  @override
-  String get pasteUrlHint => 'Paste the URL here';
-
-  @override
-  String get noVideosSaved => 'You have no saved videos';
+  String get noVideosSaved => 'Never lose a video again! 🎬';
 
   @override
   String get sharePrompt =>
-      'Share a video from YouTube,\nTikTok, Instagram or Facebook';
-
-  @override
-  String get addByUrl => 'Add by URL';
+      'Open your favorite apps, tap Share and pick Ascrollbox.\nSave them here — always a tap away.';
 
   @override
   String get noResults => 'No results';
-
-  @override
-  String get videoSaved => 'Video saved';
 
   @override
   String get deleteVideo => 'Delete video';

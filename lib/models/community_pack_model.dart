@@ -17,6 +17,15 @@ class CommunityPackModel {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  // ── Admin / moderation fields ─────────────────────────────────
+  final bool isDeleted;
+  final DateTime? deletedAt;
+  final int reportCount;
+  final bool isFlagged;
+
+  /// 'pending' | 'approved' | 'rejected'
+  final String moderationStatus;
+
   CommunityPackModel({
     required this.id,
     required this.ownerId,
@@ -33,6 +42,11 @@ class CommunityPackModel {
     required this.ratingCount,
     required this.createdAt,
     required this.updatedAt,
+    this.isDeleted = false,
+    this.deletedAt,
+    this.reportCount = 0,
+    this.isFlagged = false,
+    this.moderationStatus = 'pending',
   });
 
   double get ratingAvg =>
@@ -56,6 +70,11 @@ class CommunityPackModel {
       ratingCount: (d['ratingCount'] as num?)?.toInt() ?? 0,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (d['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isDeleted: d['isDeleted'] as bool? ?? false,
+      deletedAt: (d['deletedAt'] as Timestamp?)?.toDate(),
+      reportCount: (d['reportCount'] as num?)?.toInt() ?? 0,
+      isFlagged: d['isFlagged'] as bool? ?? false,
+      moderationStatus: d['moderationStatus'] as String? ?? 'pending',
     );
   }
 
@@ -74,6 +93,11 @@ class CommunityPackModel {
         'ratingCount': ratingCount,
         'createdAt': Timestamp.fromDate(createdAt),
         'updatedAt': Timestamp.fromDate(updatedAt),
+        'isDeleted': isDeleted,
+        if (deletedAt != null) 'deletedAt': Timestamp.fromDate(deletedAt!),
+        'reportCount': reportCount,
+        'isFlagged': isFlagged,
+        'moderationStatus': moderationStatus,
       };
 }
 

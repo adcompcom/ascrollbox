@@ -43,14 +43,10 @@ class StorageService {
   }
 
   /// Uploads profile photo bytes and returns the permanent download URL.
-  Future<String?> uploadProfilePhoto(
+  Future<String> uploadProfilePhoto(
       String uid, Uint8List bytes, String contentType) async {
-    try {
-      final ref = _storage.ref('users/$uid/profile/avatar.jpg');
-      await ref.putData(bytes, SettableMetadata(contentType: contentType));
-      return await ref.getDownloadURL();
-    } catch (_) {
-      return null;
-    }
+    final ref = _storage.ref('users/$uid/profile/avatar.jpg');
+    await ref.putData(bytes, SettableMetadata(contentType: contentType));
+    return await ref.getDownloadURL();
   }
 }

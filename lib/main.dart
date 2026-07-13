@@ -10,16 +10,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+// Not called directly — its entrypoint (bubbleSaveMain) only gets compiled
+// into the app's kernel snapshot if this file is reachable from main.dart.
+// ignore: unused_import
+import 'bubble_save.dart';
 import 'firebase_options.dart';
 import 'l10n/generated/app_localizations.dart';
-import 'models/video_model.dart';
 import 'providers/app_provider.dart';
 import 'screens/community_pack_detail_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/firestore_service.dart';
 import 'services/metadata_service.dart';
-import 'services/storage_service.dart';
 import 'theme.dart';
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
@@ -285,7 +287,6 @@ class _ShareScreen extends StatefulWidget {
 
 class _ShareScreenState extends State<_ShareScreen> {
   static const _channel = MethodChannel('ascrollbox/share');
-  bool _saving = false;
 
   @override
   void initState() {
@@ -316,10 +317,16 @@ class _ShareScreenState extends State<_ShareScreen> {
       onSave: (tags, isPrivate) {
         handled = true;
         Navigator.pop(context);
-        // Save keeps running after the sheet closes — show a spinner
-        // instead of a blank screen so it doesn't look frozen.
-        setState(() => _saving = true);
-        _saveAndClose(user.uid, url, tags, isPrivate);
+        // The actual save runs in a background service (SavingService) with
+        // its own headless engine, shown as a native Bubble notification —
+        // so we hand off and close immediately instead of staying open.
+        _channel.invokeMethod<void>('startSaving', {
+          'uid': user.uid,
+          'url': url,
+          'tags': tags,
+          'isPrivate': isPrivate,
+        });
+        _close();
       },
       onCancel: () {
         handled = true;
@@ -332,66 +339,9 @@ class _ShareScreenState extends State<_ShareScreen> {
     if (!handled) _close();
   }
 
-  Future<void> _saveAndClose(
-      String uid, String url, List<String> tags, bool isPrivate) async {
-    try {
-      final meta = await MetadataService().fetch(url);
-
-      final thumbnailUrl = meta.thumbnailUrl.isNotEmpty
-          ? (await StorageService().uploadThumbnail(uid, meta.thumbnailUrl) ??
-              meta.thumbnailUrl)
-          : '';
-
-      await FirestoreService().addVideo(
-        uid,
-        VideoModel(
-          id: '',
-          url: url,
-          platform: meta.platform,
-          title: meta.title.isEmpty ? url : meta.title,
-          thumbnailUrl: thumbnailUrl,
-          tags: tags,
-          packIds: [],
-          createdAt: DateTime.now(),
-          isPrivate: isPrivate,
-        ),
-      );
-    } finally {
-      _close();
-    }
-  }
-
   void _close() => _channel.invokeMethod<void>('close');
 
   @override
-  Widget build(BuildContext context) {
-    if (!_saving) return const Scaffold(backgroundColor: Colors.transparent);
-
-    final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      backgroundColor: Colors.black26,
-      body: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              ),
-              const SizedBox(width: 14),
-              Text(l10n.saving,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      const Scaffold(backgroundColor: Colors.transparent);
 }

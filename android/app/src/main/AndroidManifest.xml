@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
 
     <application
         android:label="ascrollbox"
@@ -14,7 +17,9 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:resizeableActivity="true"
+            android:allowEmbedded="true">
 
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
@@ -73,6 +78,13 @@
                 <data android:mimeType="text/plain"/>
             </intent-filter>
         </activity>
+
+        <!-- Foreground service that saves a shared video via a headless
+             Flutter engine, shown as a native Bubble notification -->
+        <service
+            android:name=".SavingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Disable Impeller — causes grey screen on Xiaomi/MIUI (Vulkan+GLES conflict + Width=0) -->
         <meta-data

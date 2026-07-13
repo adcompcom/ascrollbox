@@ -27,9 +27,27 @@ class ShareActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "getSharedText" -> result.success(sharedText)
+                    "startSaving"  -> { startSaving(call.arguments); result.success(null) }
                     "close"        -> { finish(); result.success(null) }
                     else           -> result.notImplemented()
                 }
             }
+    }
+
+    // Hands the save off to SavingService (headless engine + Bubble
+    // notification) so it survives this activity finishing.
+    @Suppress("UNCHECKED_CAST")
+    private fun startSaving(arguments: Any?) {
+        val args = arguments as? Map<String, Any?> ?: return
+        val intent = Intent(this, SavingService::class.java).apply {
+            putExtra(SavingService.EXTRA_UID, args["uid"] as? String)
+            putExtra(SavingService.EXTRA_URL, args["url"] as? String)
+            putStringArrayListExtra(
+                SavingService.EXTRA_TAGS,
+                ArrayList((args["tags"] as? List<String>) ?: emptyList())
+            )
+            putExtra(SavingService.EXTRA_IS_PRIVATE, args["isPrivate"] as? Boolean ?: false)
+        }
+        androidx.core.content.ContextCompat.startForegroundService(this, intent)
     }
 }

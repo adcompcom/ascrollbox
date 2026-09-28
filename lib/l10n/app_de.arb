@@ -20,6 +20,7 @@
   "loginWithMeta": "Mit Meta fortfahren",
   "loginTerms": "Mit der Fortsetzung akzeptierst du die Nutzungsbedingungen",
   "loginError": "Anmeldefehler: {error}",
+  "loginCancelled": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
 
   "home": "Start",
   "searchHint": "Videos suchen…",

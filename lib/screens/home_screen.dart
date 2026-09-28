@@ -11,6 +11,7 @@ import '../providers/app_provider.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/metadata_service.dart';
+import '../widgets/banner_ad_widget.dart';
 import '../widgets/video_card.dart';
 import 'categories_screen.dart';
 import 'packs_screen.dart';
@@ -699,6 +700,14 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                 ),
               ),
               const Divider(height: 1),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: BannerAdWidget(
+                    adUnitId: 'ca-app-pub-2779331216653992/1920051862',
+                  ),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 child: Column(

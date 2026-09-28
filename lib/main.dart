@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 
 // Not called directly — its entrypoint (bubbleSaveMain) only gets compiled
@@ -88,6 +89,17 @@ class _SplashScreen extends StatelessWidget {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  unawaited(MobileAds.instance.initialize());
+  if (kDebugMode) {
+    // Serve Google's test ads on this device instead of real (often
+    // no-fill) inventory while developing — required by AdMob policy
+    // to avoid invalid-traffic flags on real ad units.
+    MobileAds.instance.updateRequestConfiguration(
+      RequestConfiguration(
+        testDeviceIds: ['CC8F02DE97F58A8D49E53A72612CD868'],
+      ),
+    );
+  }
 
   // ShareActivity sets initialRoute to '/share'. Detect it here so we skip
   // the full app stack and show only the share bottom sheet.

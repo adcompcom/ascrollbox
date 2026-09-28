@@ -65,6 +65,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get loginCancelled => 'No se pudo iniciar sesión. Inténtalo de nuevo.';
+
+  @override
   String get home => 'Inicio';
 
   @override

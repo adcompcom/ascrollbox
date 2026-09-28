@@ -16,7 +16,13 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _signInWithGoogle() async {
     setState(() => _loading = true);
     try {
-      await _auth.signInWithGoogle();
+      final credential = await _auth.signInWithGoogle();
+      if (credential == null && mounted) {
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.loginCancelled)),
+        );
+      }
     } catch (e) {
       if (mounted) {
         final l10n = AppLocalizations.of(context);

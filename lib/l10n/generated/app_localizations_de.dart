@@ -66,6 +66,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get loginCancelled =>
+      'Anmeldung fehlgeschlagen. Bitte versuche es erneut.';
+
+  @override
   String get home => 'Start';
 
   @override

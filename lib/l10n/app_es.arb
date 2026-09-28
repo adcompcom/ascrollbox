@@ -20,6 +20,7 @@
   "loginWithMeta": "Continuar con Meta",
   "loginTerms": "Al continuar aceptas los Términos de servicio",
   "loginError": "Error al iniciar sesión: {error}",
+  "loginCancelled": "No se pudo iniciar sesión. Inténtalo de nuevo.",
 
   "home": "Inicio",
   "searchHint": "Buscar videos…",

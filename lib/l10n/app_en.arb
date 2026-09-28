@@ -38,6 +38,7 @@
   "loginTerms": "By continuing you accept the Terms of Service",
   "@loginTerms": {},
   "loginError": "Sign-in error: {error}",
+  "loginCancelled": "Sign-in didn't complete. Please try again.",
   "@loginError": {
     "placeholders": { "error": { "type": "String" } }
   },

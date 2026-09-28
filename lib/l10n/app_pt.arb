@@ -20,6 +20,7 @@
   "loginWithMeta": "Continuar com a Meta",
   "loginTerms": "Ao continuar, você aceita os Termos de Serviço",
   "loginError": "Erro ao entrar: {error}",
+  "loginCancelled": "Não foi possível entrar. Tente novamente.",
 
   "home": "Início",
   "searchHint": "Buscar vídeos…",

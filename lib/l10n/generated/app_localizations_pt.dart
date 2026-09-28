@@ -65,6 +65,9 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get loginCancelled => 'Não foi possível entrar. Tente novamente.';
+
+  @override
   String get home => 'Início';
 
   @override

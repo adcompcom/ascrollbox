@@ -210,6 +210,12 @@ abstract class AppLocalizations {
   /// **'Sign-in error: {error}'**
   String loginError(String error);
 
+  /// No description provided for @loginCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in didn\'t complete. Please try again.'**
+  String get loginCancelled;
+
   /// No description provided for @home.
   ///
   /// In en, this message translates to:

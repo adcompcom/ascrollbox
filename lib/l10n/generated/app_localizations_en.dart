@@ -65,6 +65,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get loginCancelled => 'Sign-in didn\'t complete. Please try again.';
+
+  @override
   String get home => 'Home';
 
   @override

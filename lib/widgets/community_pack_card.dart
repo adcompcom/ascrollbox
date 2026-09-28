@@ -33,14 +33,7 @@ class CommunityPackCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Background — owner avatar or placeholder
-              pack.ownerPhotoUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: pack.ownerPhotoUrl!,
-                      fit: BoxFit.cover,
-                      errorWidget: (_, _, _) => _placeholder(theme),
-                    )
-                  : _placeholder(theme),
+              _placeholder(theme),
 
               // Dark gradient overlay
               const DecoratedBox(
@@ -53,6 +46,9 @@ class CommunityPackCard extends StatelessWidget {
                   ),
                 ),
               ),
+
+              // Top-left owner avatar
+              Positioned(top: 8, left: 8, child: _OwnerAvatar(pack: pack)),
 
               // Top-right badge
               Positioned(
@@ -171,4 +167,45 @@ class CommunityPackCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _OwnerAvatar extends StatelessWidget {
+  final CommunityPackModel pack;
+  const _OwnerAvatar({required this.pack});
+
+  static const _size = 30.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final initial = Text(
+      pack.ownerName.isNotEmpty ? pack.ownerName[0].toUpperCase() : '?',
+      style: TextStyle(
+        color: scheme.primary,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+
+    return Container(
+      width: _size,
+      height: _size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: scheme.primaryContainer,
+        border: Border.all(color: Colors.white, width: 1.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      alignment: Alignment.center,
+      child: pack.ownerPhotoUrl != null
+          ? CachedNetworkImage(
+              imageUrl: pack.ownerPhotoUrl!,
+              width: _size,
+              height: _size,
+              fit: BoxFit.cover,
+              errorWidget: (_, _, _) => initial,
+            )
+          : initial,
+    );
+  }
 }

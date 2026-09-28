@@ -266,5 +266,9 @@
   "changePin": "PIN ändern",
   "accountSection": "Konto",
   "nicknameTaken": "Dieser Benutzername ist bereits vergeben",
-  "nicknameInvalid": "Nur Buchstaben, Zahlen, Punkte und Unterstriche erlaubt"
+  "nicknameInvalid": "Nur Buchstaben, Zahlen, Punkte und Unterstriche erlaubt",
+  "appearanceSection": "Darstellung",
+  "themeSystem": "System",
+  "themeLight": "Hell",
+  "themeDark": "Dunkel"
 }

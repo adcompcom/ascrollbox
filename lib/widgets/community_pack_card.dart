@@ -8,11 +8,7 @@ class CommunityPackCard extends StatelessWidget {
   final CommunityPackModel pack;
   final VoidCallback onTap;
 
-  const CommunityPackCard({
-    super.key,
-    required this.pack,
-    required this.onTap,
-  });
+  const CommunityPackCard({super.key, required this.pack, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +18,7 @@ class CommunityPackCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.bgTertiary,
+          color: context.palette.bgTertiary,
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [
             BoxShadow(
@@ -42,8 +38,7 @@ class CommunityPackCard extends StatelessWidget {
                   ? CachedNetworkImage(
                       imageUrl: pack.ownerPhotoUrl!,
                       fit: BoxFit.cover,
-                      errorWidget: (_, _, _) =>
-                          _placeholder(theme),
+                      errorWidget: (_, _, _) => _placeholder(theme),
                     )
                   : _placeholder(theme),
 
@@ -64,8 +59,10 @@ class CommunityPackCard extends StatelessWidget {
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: pack.isPublic
                         ? Colors.green.withValues(alpha: 0.85)
@@ -76,9 +73,7 @@ class CommunityPackCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        pack.isPublic
-                            ? Icons.public
-                            : Icons.vpn_key_outlined,
+                        pack.isPublic ? Icons.public : Icons.vpn_key_outlined,
                         size: 10,
                         color: Colors.white,
                       ),
@@ -129,23 +124,29 @@ class CommunityPackCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.visibility_outlined,
-                            size: 11, color: Color(0x99FFFFFF)),
+                        const Icon(
+                          Icons.visibility_outlined,
+                          size: 11,
+                          color: Color(0x99FFFFFF),
+                        ),
                         const SizedBox(width: 3),
                         Text(
                           '${pack.viewCount}',
                           style: const TextStyle(
-                              color: Color(0x99FFFFFF), fontSize: 11),
+                            color: Color(0x99FFFFFF),
+                            fontSize: 11,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         if (pack.ratingCount > 0) ...[
-                          const Icon(Icons.star,
-                              size: 11, color: Colors.amber),
+                          const Icon(Icons.star, size: 11, color: Colors.amber),
                           const SizedBox(width: 3),
                           Text(
                             pack.ratingAvg.toStringAsFixed(1),
                             style: const TextStyle(
-                                color: Color(0xCCFFFFFF), fontSize: 11),
+                              color: Color(0xCCFFFFFF),
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ],
@@ -161,13 +162,13 @@ class CommunityPackCard extends StatelessWidget {
   }
 
   Widget _placeholder(ThemeData theme) => Container(
-        color: theme.colorScheme.primary.withValues(alpha: 0.15),
-        child: Center(
-          child: Icon(
-            Icons.folder_shared_outlined,
-            size: 48,
-            color: theme.colorScheme.primary.withValues(alpha: 0.4),
-          ),
-        ),
-      );
+    color: theme.colorScheme.primary.withValues(alpha: 0.15),
+    child: Center(
+      child: Icon(
+        Icons.folder_shared_outlined,
+        size: 48,
+        color: theme.colorScheme.primary.withValues(alpha: 0.4),
+      ),
+    ),
+  );
 }

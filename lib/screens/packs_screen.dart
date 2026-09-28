@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../utils/tap_guard.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/community_pack_model.dart';
 import '../providers/app_provider.dart';
@@ -11,6 +12,7 @@ import 'community_pack_detail_screen.dart';
 import 'find_pack_screen.dart';
 import 'pack_detail_screen.dart';
 import 'pack_form_screen.dart';
+import '../theme.dart';
 
 class PacksScreen extends StatelessWidget {
   const PacksScreen({super.key});
@@ -18,48 +20,58 @@ class PacksScreen extends StatelessWidget {
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
   Future<void> _createPack(BuildContext context) async {
-    await Navigator.push(
+    await pushOnce(
       context,
       MaterialPageRoute(builder: (_) => const PackFormScreen()),
     );
   }
 
   Future<void> _renamePack(
-      BuildContext context, String packId, String current) async {
-    final pack = context
-        .read<AppProvider>()
-        .packs
-        .firstWhere((p) => p.id == packId);
-    await Navigator.push(
+    BuildContext context,
+    String packId,
+    String current,
+  ) async {
+    final pack = context.read<AppProvider>().packs.firstWhere(
+      (p) => p.id == packId,
+    );
+    await pushOnce(
       context,
       MaterialPageRoute(builder: (_) => PackFormScreen(existing: pack)),
     );
   }
 
   Future<void> _confirmDelete(
-      BuildContext context, String packId, String name) async {
+    BuildContext context,
+    String packId,
+    String name,
+  ) => runOnce('deletePack:$packId', () async {
     final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text(l10n.deletePack),
         content: Text(l10n.deletePackConfirm(name)),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(l10n.cancel)),
+            onPressed: () => popOnce(ctx, false),
+            child: Text(l10n.cancel),
+          ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.delete,
-                style: const TextStyle(color: Colors.red)),
+            onPressed: () => popOnce(ctx, true),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
     if (ok == true && context.mounted) {
-      await context.read<AppProvider>().deletePack(_uid, packId);
+      final messenger = ScaffoldMessenger.of(context);
+      try {
+        await context.read<AppProvider>().deletePack(_uid, packId);
+      } catch (e) {
+        messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
-  }
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -119,22 +131,30 @@ class _MyPacksTab extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.folder_open,
-                        size: 72, color: Colors.grey[300]),
+                    Icon(
+                      Icons.folder_open,
+                      size: 72,
+                      color: context.palette.muted,
+                    ),
                     const SizedBox(height: 16),
-                    Text(l10n.packsEmpty,
-                        style: TextStyle(
-                            color: Colors.grey[500], fontSize: 16)),
+                    Text(
+                      l10n.packsEmpty,
+                      style: TextStyle(
+                        color: context.palette.textTertiary,
+                        fontSize: 16,
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    Text(l10n.packsEmptySubtitle,
-                        style: TextStyle(color: Colors.grey[400])),
+                    Text(
+                      l10n.packsEmptySubtitle,
+                      style: TextStyle(color: context.palette.textTertiary),
+                    ),
                   ],
                 ),
               )
             : GridView.builder(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   childAspectRatio: 1.0,
                   crossAxisSpacing: 10,
@@ -147,16 +167,14 @@ class _MyPacksTab extends StatelessWidget {
                   return PackCard(
                     pack: pack,
                     videos: videos,
-                    onTap: () => Navigator.push(
+                    onTap: () => pushOnce(
                       context,
                       MaterialPageRoute(
                         builder: (_) => PackDetailScreen(pack: pack),
                       ),
                     ),
-                    onRename: () =>
-                        onRenamePack(context, pack.id, pack.name),
-                    onDelete: () =>
-                        onDeletePack(context, pack.id, pack.name),
+                    onRename: () => onRenamePack(context, pack.id, pack.name),
+                    onDelete: () => onDeletePack(context, pack.id, pack.name),
                   );
                 },
               ),
@@ -179,10 +197,9 @@ class _MyPacksTab extends StatelessWidget {
 
 class _SharedPacksTab extends StatelessWidget {
   void _openPack(BuildContext context, CommunityPackModel pack) {
-    Navigator.push(
+    pushOnce(
       context,
-      MaterialPageRoute(
-          builder: (_) => CommunityPackDetailScreen(pack: pack)),
+      MaterialPageRoute(builder: (_) => CommunityPackDetailScreen(pack: pack)),
     );
   }
 
@@ -209,21 +226,33 @@ class _SharedPacksTab extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.folder_shared_outlined,
-                        size: 72, color: Colors.grey[300]),
+                    Icon(
+                      Icons.folder_shared_outlined,
+                      size: 72,
+                      color: context.palette.muted,
+                    ),
                     const SizedBox(height: 16),
-                    Text(l10n.sharedEmpty,
-                        style: TextStyle(
-                            color: Colors.grey[500], fontSize: 16)),
+                    Text(
+                      l10n.sharedEmpty,
+                      style: TextStyle(
+                        color: context.palette.textTertiary,
+                        fontSize: 16,
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    Text(l10n.sharedEmptySubtitle,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey[400])),
+                    Text(
+                      l10n.sharedEmptySubtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: context.palette.textTertiary),
+                    ),
                     const SizedBox(height: 24),
                     OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context,
-                          MaterialPageRoute(
-                              builder: (_) => const FindPackScreen())),
+                      onPressed: () => pushOnce(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const FindPackScreen(),
+                        ),
+                      ),
                       icon: const Icon(Icons.vpn_key_outlined),
                       label: Text(l10n.packEnterCode),
                     ),
@@ -236,22 +265,23 @@ class _SharedPacksTab extends StatelessWidget {
                   if (saved.isNotEmpty) ...[
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(l10n.sharedPacks,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(color: Colors.grey[600])),
+                      child: Text(
+                        l10n.sharedPacks,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: context.palette.textSecondary,
+                        ),
+                      ),
                     ),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 1.0,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                      ),
+                            crossAxisCount: 2,
+                            childAspectRatio: 1.0,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                          ),
                       itemCount: saved.length,
                       itemBuilder: (_, i) => CommunityPackCard(
                         pack: saved[i],
@@ -263,22 +293,23 @@ class _SharedPacksTab extends StatelessWidget {
                   if (discover.isNotEmpty) ...[
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(l10n.packExplore,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(color: Colors.grey[600])),
+                      child: Text(
+                        l10n.packExplore,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: context.palette.textSecondary,
+                        ),
+                      ),
                     ),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 1.0,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                      ),
+                            crossAxisCount: 2,
+                            childAspectRatio: 1.0,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                          ),
                       itemCount: discover.length,
                       itemBuilder: (_, i) => CommunityPackCard(
                         pack: discover[i],
@@ -293,8 +324,10 @@ class _SharedPacksTab extends StatelessWidget {
           right: 16,
           child: FloatingActionButton.extended(
             heroTag: 'find_pack',
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const FindPackScreen())),
+            onPressed: () => pushOnce(
+              context,
+              MaterialPageRoute(builder: (_) => const FindPackScreen()),
+            ),
             icon: const Icon(Icons.vpn_key_outlined),
             label: Text(l10n.packEnterCode),
           ),

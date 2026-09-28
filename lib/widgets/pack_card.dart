@@ -4,6 +4,7 @@ import '../l10n/generated/app_localizations.dart';
 import '../models/pack_model.dart';
 import '../models/video_model.dart';
 import '../theme.dart';
+import '../utils/tap_guard.dart';
 
 class PackCard extends StatelessWidget {
   final PackModel pack;
@@ -32,7 +33,7 @@ class PackCard extends StatelessWidget {
       onLongPress: () => _showOptions(context),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.bgTertiary,
+          color: context.palette.bgTertiary,
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [
             BoxShadow(
@@ -107,7 +108,7 @@ class PackCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
-      builder: (_) => SafeArea(
+      builder: (sheetCtx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -116,8 +117,7 @@ class PackCard extends StatelessWidget {
               leading: const Icon(Icons.open_in_new),
               title: Text(l10n.open),
               onTap: () {
-                Navigator.pop(context);
-                onTap();
+                if (popOnce(sheetCtx)) onTap();
               },
             ),
             if (onRename != null)
@@ -125,19 +125,18 @@ class PackCard extends StatelessWidget {
                 leading: const Icon(Icons.edit_outlined),
                 title: Text(l10n.rename),
                 onTap: () {
-                  Navigator.pop(context);
-                  onRename!();
+                  if (popOnce(sheetCtx)) onRename!();
                 },
               ),
             if (onDelete != null)
               ListTile(
-                leading: const Icon(Icons.delete_outline,
-                    color: AppColors.red),
-                title: Text(l10n.deletePack,
-                    style: const TextStyle(color: AppColors.red)),
+                leading: const Icon(Icons.delete_outline, color: AppColors.red),
+                title: Text(
+                  l10n.deletePack,
+                  style: const TextStyle(color: AppColors.red),
+                ),
                 onTap: () {
-                  Navigator.pop(context);
-                  onDelete!();
+                  if (popOnce(sheetCtx)) onDelete!();
                 },
               ),
             const SizedBox(height: 8),
@@ -158,10 +157,13 @@ class _ThumbGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     if (thumbs.isEmpty) {
       return Container(
-        color: AppColors.bgTertiary,
-        child: const Center(
-          child: Icon(Icons.folder_open,
-              size: 48, color: AppColors.textTertiary),
+        color: context.palette.bgTertiary,
+        child: Center(
+          child: Icon(
+            Icons.folder_open,
+            size: 48,
+            color: context.palette.textTertiary,
+          ),
         ),
       );
     }
@@ -170,7 +172,7 @@ class _ThumbGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       children: List.generate(4, (i) {
         if (i >= thumbs.length) {
-          return Container(color: AppColors.bgTertiary);
+          return Container(color: context.palette.bgTertiary);
         }
         final url = thumbs[i].thumbnailUrl;
         return url.isNotEmpty
@@ -178,9 +180,9 @@ class _ThumbGrid extends StatelessWidget {
                 imageUrl: url,
                 fit: BoxFit.cover,
                 errorWidget: (_, _, _) =>
-                    Container(color: AppColors.bgTertiary),
+                    Container(color: context.palette.bgTertiary),
               )
-            : Container(color: AppColors.bgTertiary);
+            : Container(color: context.palette.bgTertiary);
       }),
     );
   }
@@ -189,14 +191,14 @@ class _ThumbGrid extends StatelessWidget {
 class _SheetHandle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
-        child: Container(
-          margin: const EdgeInsets.only(top: 10, bottom: 4),
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: AppColors.bgTertiary,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      );
+    child: Container(
+      margin: const EdgeInsets.only(top: 10, bottom: 4),
+      width: 36,
+      height: 4,
+      decoration: BoxDecoration(
+        color: context.palette.bgTertiary,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    ),
+  );
 }

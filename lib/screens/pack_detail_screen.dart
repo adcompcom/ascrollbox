@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../utils/tap_guard.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/pack_model.dart';
 import '../models/tag_model.dart';
@@ -11,6 +12,7 @@ import '../widgets/video_card.dart';
 import 'pack_form_screen.dart';
 import 'pack_publish_screen.dart';
 import 'video_player_screen.dart';
+import '../theme.dart';
 
 class PackDetailScreen extends StatelessWidget {
   final PackModel pack;
@@ -18,17 +20,23 @@ class PackDetailScreen extends StatelessWidget {
 
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
-  Future<void> _showAddVideosSheet(BuildContext context) async {
+  Future<void> _showAddVideosSheet(BuildContext context) => runOnce(
+    'addVideosSheet:${pack.id}',
+    () => _showAddVideosSheetImpl(context),
+  );
+
+  Future<void> _showAddVideosSheetImpl(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
     final provider = context.read<AppProvider>();
     final alreadyIn = pack.videoIds.toSet();
-    final available =
-        provider.videos.where((v) => !alreadyIn.contains(v.id)).toList();
+    final available = provider.videos
+        .where((v) => !alreadyIn.contains(v.id))
+        .toList();
 
     if (available.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.noAvailableVideos)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.noAvailableVideos)));
       return;
     }
 
@@ -39,7 +47,8 @@ class PackDetailScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.65,
@@ -58,23 +67,39 @@ class PackDetailScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmRemove(BuildContext context, AppProvider provider,
-      String packId, VideoModel video) async {
+  Future<void> _confirmRemove(
+    BuildContext context,
+    AppProvider provider,
+    String packId,
+    VideoModel video,
+  ) => runOnce(
+    'removeFromPack:$packId:${video.id}',
+    () => _confirmRemoveImpl(context, provider, packId, video),
+  );
+
+  Future<void> _confirmRemoveImpl(
+    BuildContext context,
+    AppProvider provider,
+    String packId,
+    VideoModel video,
+  ) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text(l10n.removeFromPack),
         content: Text(l10n.deleteVideoConfirm(video.title)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => popOnce(ctx, false),
             child: Text(l10n.cancel),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.removeFromPack,
-                style: const TextStyle(color: Colors.red)),
+            onPressed: () => popOnce(ctx, true),
+            child: Text(
+              l10n.removeFromPack,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -84,9 +109,9 @@ class PackDetailScreen extends StatelessWidget {
       await provider.removeVideoFromPack(_uid, packId, video.id);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -95,8 +120,10 @@ class PackDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final provider = context.watch<AppProvider>();
-    final livePack =
-        provider.packs.firstWhere((p) => p.id == pack.id, orElse: () => pack);
+    final livePack = provider.packs.firstWhere(
+      (p) => p.id == pack.id,
+      orElse: () => pack,
+    );
     final videos = provider.videosInPack(livePack);
 
     return Scaffold(
@@ -107,21 +134,23 @@ class PackDetailScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: l10n.edit,
-            onPressed: () => Navigator.push(
+            onPressed: () => pushOnce(
               context,
               MaterialPageRoute(
-                  builder: (_) => PackFormScreen(existing: livePack)),
+                builder: (_) => PackFormScreen(existing: livePack),
+              ),
             ),
           ),
           IconButton(
-            icon: Icon(livePack.isPublished
-                ? Icons.public
-                : Icons.share_outlined),
+            icon: Icon(
+              livePack.isPublished ? Icons.public : Icons.share_outlined,
+            ),
             tooltip: l10n.packShare,
-            onPressed: () => Navigator.push(
+            onPressed: () => pushOnce(
               context,
               MaterialPageRoute(
-                  builder: (_) => PackPublishScreen(pack: livePack)),
+                builder: (_) => PackPublishScreen(pack: livePack),
+              ),
             ),
           ),
           IconButton(
@@ -143,11 +172,12 @@ class PackDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (livePack.description.isNotEmpty)
-                    Text(livePack.description,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Colors.grey[700])),
+                    Text(
+                      livePack.description,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: context.palette.textSecondary,
+                      ),
+                    ),
                   if (livePack.tags.isNotEmpty) ...[
                     if (livePack.description.isNotEmpty)
                       const SizedBox(height: 6),
@@ -159,8 +189,9 @@ class PackDetailScreen extends StatelessWidget {
                         final name = t.localized(context);
                         return Chip(
                           label: Text(
-                              emoji != null ? '$emoji $name' : name,
-                              style: const TextStyle(fontSize: 11)),
+                            emoji != null ? '$emoji $name' : name,
+                            style: const TextStyle(fontSize: 11),
+                          ),
                           visualDensity: VisualDensity.compact,
                           materialTapTargetSize:
                               MaterialTapTargetSize.shrinkWrap,
@@ -177,11 +208,16 @@ class PackDetailScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.video_library_outlined,
-                            size: 72, color: Colors.grey[300]),
+                        Icon(
+                          Icons.video_library_outlined,
+                          size: 72,
+                          color: context.palette.muted,
+                        ),
                         const SizedBox(height: 16),
-                        Text(l10n.packEmpty,
-                            style: TextStyle(color: Colors.grey[500])),
+                        Text(
+                          l10n.packEmpty,
+                          style: TextStyle(color: context.palette.textTertiary),
+                        ),
                         const SizedBox(height: 16),
                         OutlinedButton.icon(
                           onPressed: () => _showAddVideosSheet(context),
@@ -195,24 +231,28 @@ class PackDetailScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.72,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                    ),
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.72,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
                     itemCount: videos.length,
                     itemBuilder: (_, i) {
                       final video = videos[i];
                       return VideoCard(
                         video: video,
-                        onTap: () => Navigator.push(
+                        onTap: () => pushOnce(
                           context,
                           MaterialPageRoute(
                             builder: (_) => VideoPlayerScreen(video: video),
                           ),
                         ),
-                        onRemoveFromPack: () =>
-                            _confirmRemove(context, provider, livePack.id, video),
+                        onRemoveFromPack: () => _confirmRemove(
+                          context,
+                          provider,
+                          livePack.id,
+                          video,
+                        ),
                       );
                     },
                   ),
@@ -290,7 +330,7 @@ class _AddVideoSheetState extends State<_AddVideoSheet> {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: context.palette.muted,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -313,8 +353,11 @@ class _AddVideoSheetState extends State<_AddVideoSheet> {
             autofocus: false,
             decoration: InputDecoration(
               hintText: l10n.searchHint,
-              hintStyle: TextStyle(color: Colors.grey[500]),
-              prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
+              hintStyle: TextStyle(color: context.palette.textTertiary),
+              prefixIcon: Icon(
+                Icons.search,
+                color: context.palette.textTertiary,
+              ),
               suffixIcon: _query.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear),
@@ -346,7 +389,10 @@ class _AddVideoSheetState extends State<_AddVideoSheet> {
               alignment: Alignment.centerLeft,
               child: Text(
                 '${filtered.length} / ${widget.available.length}',
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.palette.textTertiary,
+                ),
               ),
             ),
           ),
@@ -357,7 +403,7 @@ class _AddVideoSheetState extends State<_AddVideoSheet> {
               ? Center(
                   child: Text(
                     l10n.noResults,
-                    style: TextStyle(color: Colors.grey[500]),
+                    style: TextStyle(color: context.palette.textTertiary),
                   ),
                 )
               : ListView.builder(
@@ -373,12 +419,17 @@ class _AddVideoSheetState extends State<_AddVideoSheet> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text(v.platform),
-                      trailing: const Icon(Icons.add_circle_outline,
-                          color: Colors.grey),
+                      trailing: const Icon(
+                        Icons.add_circle_outline,
+                        color: Colors.grey,
+                      ),
                       onTap: () async {
-                        Navigator.pop(context);
-                        await widget.provider
-                            .addVideoToPack(widget.uid, widget.packId, v.id);
+                        if (!popOnce(context)) return;
+                        await widget.provider.addVideoToPack(
+                          widget.uid,
+                          widget.packId,
+                          v.id,
+                        );
                         widget.onAdded();
                       },
                     );

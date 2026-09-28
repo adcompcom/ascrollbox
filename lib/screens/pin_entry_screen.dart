@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../services/firestore_service.dart';
 import 'security_questions_screen.dart';
+import '../theme.dart';
+import '../utils/tap_guard.dart';
 
 class PinEntryScreen extends StatefulWidget {
   final String uid;
@@ -66,8 +68,7 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
             final done = await Navigator.push<bool>(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    SecurityQuestionsSetupScreen(uid: widget.uid),
+                builder: (_) => SecurityQuestionsSetupScreen(uid: widget.uid),
               ),
             );
             if (done == true && mounted) {
@@ -97,7 +98,7 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
   }
 
   void _openRecovery() {
-    Navigator.push(
+    pushOnce(
       context,
       MaterialPageRoute(
         builder: (_) => SecurityQuestionsVerifyScreen(uid: widget.uid),
@@ -114,8 +115,9 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
     final String subtitle;
     if (widget.isSetup) {
       title = _inConfirm ? l10n.privateConfirmTitle : l10n.privateSetupTitle;
-      subtitle =
-          _inConfirm ? l10n.privateConfirmSubtitle : l10n.privateSetupSubtitle;
+      subtitle = _inConfirm
+          ? l10n.privateConfirmSubtitle
+          : l10n.privateSetupSubtitle;
     } else {
       title = l10n.privateTitle;
       subtitle = l10n.privateEnterSubtitle;
@@ -134,12 +136,17 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
         child: Column(
           children: [
             const Spacer(),
-            Icon(Icons.lock_outline, size: 56, color: theme.colorScheme.primary),
+            Icon(
+              Icons.lock_outline,
+              size: 56,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(height: 20),
             Text(
               title,
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 10),
             Padding(
@@ -147,8 +154,9 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
               child: Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: Colors.grey[600]),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: context.palette.textSecondary,
+                ),
               ),
             ),
             const SizedBox(height: 40),
@@ -167,14 +175,14 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
                     color: _error
                         ? Colors.red
                         : filled
-                            ? theme.colorScheme.primary
-                            : Colors.transparent,
+                        ? theme.colorScheme.primary
+                        : Colors.transparent,
                     border: Border.all(
                       color: _error
                           ? Colors.red
                           : filled
-                              ? theme.colorScheme.primary
-                              : Colors.grey[400]!,
+                          ? theme.colorScheme.primary
+                          : context.palette.textTertiary,
                       width: 2,
                     ),
                   ),
@@ -186,9 +194,7 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
               opacity: _error ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 200),
               child: Text(
-                widget.isSetup
-                    ? l10n.privatePinMismatch
-                    : l10n.privatePinWrong,
+                widget.isSetup ? l10n.privatePinMismatch : l10n.privatePinWrong,
                 style: const TextStyle(color: Colors.red, fontSize: 13),
               ),
             ),
@@ -204,7 +210,10 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
                   onPressed: _openRecovery,
                   child: Text(
                     l10n.privateForgotPin,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    style: TextStyle(
+                      color: context.palette.textSecondary,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],

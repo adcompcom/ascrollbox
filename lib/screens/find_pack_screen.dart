@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../utils/tap_guard.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../providers/app_provider.dart';
 import 'community_pack_detail_screen.dart';
+import '../theme.dart';
 
 class FindPackScreen extends StatefulWidget {
   const FindPackScreen({super.key});
@@ -24,16 +26,20 @@ class _FindPackScreenState extends State<FindPackScreen> {
   }
 
   Future<void> _search() async {
+    if (_loading) return;
     final code = _ctrl.text.trim().toUpperCase();
     if (code.length != 6) return;
-    setState(() { _loading = true; _notFound = false; });
+    setState(() {
+      _loading = true;
+      _notFound = false;
+    });
     final pack = await context.read<AppProvider>().findPackByCode(code);
     if (!mounted) return;
     setState(() => _loading = false);
     if (pack == null) {
       setState(() => _notFound = true);
     } else {
-      await Navigator.push(
+      await pushOnce(
         context,
         MaterialPageRoute(
           builder: (_) => CommunityPackDetailScreen(pack: pack),
@@ -54,14 +60,18 @@ class _FindPackScreenState extends State<FindPackScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(Icons.vpn_key_outlined,
-                size: 56, color: theme.colorScheme.primary),
+            Icon(
+              Icons.vpn_key_outlined,
+              size: 56,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(height: 20),
             Text(
               l10n.packEnterCode,
               textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 32),
             TextField(
@@ -77,7 +87,7 @@ class _FindPackScreenState extends State<FindPackScreen> {
               decoration: InputDecoration(
                 hintText: 'A3K9F2',
                 hintStyle: TextStyle(
-                  color: Colors.grey[400],
+                  color: context.palette.textTertiary,
                   letterSpacing: 8,
                 ),
                 border: const OutlineInputBorder(),

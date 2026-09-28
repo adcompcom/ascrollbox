@@ -799,4 +799,16 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get nicknameInvalid =>
       'Somente letras, números, pontos e sublinhados são permitidos';
+
+  @override
+  String get appearanceSection => 'Aparência';
+
+  @override
+  String get themeSystem => 'Sistema';
+
+  @override
+  String get themeLight => 'Claro';
+
+  @override
+  String get themeDark => 'Escuro';
 }

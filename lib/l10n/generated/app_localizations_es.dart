@@ -798,4 +798,16 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get nicknameInvalid => 'Solo letras, números, puntos y guiones bajos';
+
+  @override
+  String get appearanceSection => 'Apariencia';
+
+  @override
+  String get themeSystem => 'Sistema';
+
+  @override
+  String get themeLight => 'Claro';
+
+  @override
+  String get themeDark => 'Oscuro';
 }

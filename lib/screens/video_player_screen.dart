@@ -9,6 +9,8 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/video_model.dart';
 import '../providers/app_provider.dart';
+import '../theme.dart';
+import '../utils/tap_guard.dart';
 
 /// Platforms that block embedding — open in native app instead.
 const _nativeOnlyPlatforms = {'youtube', 'tiktok', 'facebook', 'instagram'};
@@ -45,19 +47,25 @@ class _NativeOpenScreenState extends State<_NativeOpenScreen> {
     _notes = widget.video.notes;
   }
 
-  Future<void> _open(BuildContext context) async {
+  Future<void> _open(BuildContext context) =>
+      runOnce('openVideo:${widget.video.id}', () => _openImpl(context));
+
+  Future<void> _openImpl(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
     final uri = Uri.tryParse(widget.video.url);
     if (uri == null) return;
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.openAppFailed)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.openAppFailed)));
     }
   }
 
-  Future<void> _editNotes(BuildContext context) async {
+  Future<void> _editNotes(BuildContext context) =>
+      runOnce('editNotes:${widget.video.id}', () => _editNotesImpl(context));
+
+  Future<void> _editNotesImpl(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
     final controller = TextEditingController(text: _notes ?? '');
     final result = await showDialog<String>(
@@ -72,56 +80,65 @@ class _NativeOpenScreenState extends State<_NativeOpenScreen> {
           textCapitalization: TextCapitalization.sentences,
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(l10n.cancel)),
+          TextButton(onPressed: () => popOnce(ctx), child: Text(l10n.cancel)),
           FilledButton(
-              onPressed: () =>
-                  Navigator.pop(ctx, controller.text.trim()),
-              child: Text(l10n.save)),
+            onPressed: () => popOnce(ctx, controller.text.trim()),
+            child: Text(l10n.save),
+          ),
         ],
       ),
     );
     if (result == null || !context.mounted) return;
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    await context
-        .read<AppProvider>()
-        .updateVideoNotes(uid, widget.video, result.isEmpty ? null : result);
-    setState(() => _notes = result.isEmpty ? null : result);
+    try {
+      await context.read<AppProvider>().updateVideoNotes(
+        uid,
+        widget.video,
+        result.isEmpty ? null : result,
+      );
+      if (mounted) setState(() => _notes = result.isEmpty ? null : result);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   String get _appName => switch (widget.video.platform) {
-        'youtube' => 'YouTube',
-        'tiktok' => 'TikTok',
-        'facebook' => 'Facebook',
-        'instagram' => 'Instagram',
-        _ => widget.video.platform,
-      };
+    'youtube' => 'YouTube',
+    'tiktok' => 'TikTok',
+    'facebook' => 'Facebook',
+    'instagram' => 'Instagram',
+    _ => widget.video.platform,
+  };
 
   IconData get _platformIcon => switch (widget.video.platform) {
-        'youtube' => Icons.smart_display,
-        'tiktok' => Icons.music_video,
-        'facebook' => Icons.facebook,
-        'instagram' => Icons.camera_alt,
-        _ => Icons.open_in_new,
-      };
+    'youtube' => Icons.smart_display,
+    'tiktok' => Icons.music_video,
+    'facebook' => Icons.facebook,
+    'instagram' => Icons.camera_alt,
+    _ => Icons.open_in_new,
+  };
 
   Color get _platformColor => switch (widget.video.platform) {
-        'youtube' => const Color(0xFFFF0000),
-        'tiktok' => Colors.black87,
-        'facebook' => const Color(0xFF1877F2),
-        'instagram' => const Color(0xFFE1306C),
-        _ => Colors.grey,
-      };
+    'youtube' => const Color(0xFFFF0000),
+    'tiktok' => context.palette.tiktok,
+    'facebook' => const Color(0xFF1877F2),
+    'instagram' => const Color(0xFFE1306C),
+    _ => Colors.grey,
+  };
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final owned = context.watch<AppProvider>().ownsVideo(widget.video.id);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.video.title, overflow: TextOverflow.ellipsis),
-        actions: [_AddToPackButton(video: widget.video)],
+        actions: [if (owned) _AddToPackButton(video: widget.video)],
       ),
       body: Column(
         children: [
@@ -163,7 +180,9 @@ class _NativeOpenScreenState extends State<_NativeOpenScreen> {
                   // Platform badge
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: _platformColor,
                       borderRadius: BorderRadius.circular(6),
@@ -171,95 +190,101 @@ class _NativeOpenScreenState extends State<_NativeOpenScreen> {
                     child: Text(
                       _appName,
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold),
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     widget.video.title,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   if (widget.video.tags.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
                       children: widget.video.tags
-                          .map((s) => Chip(
-                                label: Text(s,
-                                    style: const TextStyle(fontSize: 12)),
-                                visualDensity: VisualDensity.compact,
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                              ))
+                          .map(
+                            (s) => Chip(
+                              label: Text(
+                                s,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          )
                           .toList(),
                     ),
                   ],
                   const SizedBox(height: 8),
                   Text(
                     l10n.savedOn(_fmt(widget.video.createdAt)),
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Colors.grey[600]),
-                  ),
-
-                  // Notes section
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Icon(Icons.notes,
-                          size: 16, color: Colors.grey[500]),
-                      const SizedBox(width: 6),
-                      Text(l10n.notes,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelMedium
-                              ?.copyWith(color: Colors.grey[600])),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () => _editNotes(context),
-                        child: Icon(Icons.edit_outlined,
-                            size: 16,
-                            color:
-                                Theme.of(context).colorScheme.primary),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  GestureDetector(
-                    onTap: () => _editNotes(context),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _notes?.isNotEmpty == true
-                            ? _notes!
-                            : l10n.notesHint,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(
-                              color: _notes?.isNotEmpty == true
-                                  ? null
-                                  : Colors.grey[500],
-                              fontStyle: _notes?.isNotEmpty == true
-                                  ? FontStyle.normal
-                                  : FontStyle.italic,
-                            ),
-                      ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.palette.textSecondary,
                     ),
                   ),
+
+                  // Notes section — only for videos in the user's library;
+                  // someone else's community-pack video has nowhere to save.
+                  if (owned) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.notes,
+                          size: 16,
+                          color: context.palette.textTertiary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          l10n.notes,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: context.palette.textSecondary),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => _editNotes(context),
+                          child: Icon(
+                            Icons.edit_outlined,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: () => _editNotes(context),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _notes?.isNotEmpty == true ? _notes! : l10n.notesHint,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: _notes?.isNotEmpty == true
+                                    ? null
+                                    : context.palette.textTertiary,
+                                fontStyle: _notes?.isNotEmpty == true
+                                    ? FontStyle.normal
+                                    : FontStyle.italic,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 28),
                   // Open button
@@ -270,16 +295,18 @@ class _NativeOpenScreenState extends State<_NativeOpenScreen> {
                       style: FilledButton.styleFrom(
                         backgroundColor: _platformColor,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onPressed: () => _open(context),
                       icon: Icon(_platformIcon, color: Colors.white),
                       label: Text(
                         l10n.openInApp(_appName),
                         style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -293,9 +320,9 @@ class _NativeOpenScreenState extends State<_NativeOpenScreen> {
   }
 
   Widget _thumbPlaceholder() => Container(
-        color: Colors.grey[900],
-        child: const Icon(Icons.ondemand_video, size: 64, color: Colors.grey),
-      );
+    color: Colors.grey[900],
+    child: const Icon(Icons.ondemand_video, size: 64, color: Colors.grey),
+  );
 
   String _fmt(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}/'
@@ -328,11 +355,13 @@ class _WebViewScreenState extends State<_WebViewScreen> {
         'AppleWebKit/537.36 (KHTML, like Gecko) '
         'Chrome/120.0.6099.144 Mobile Safari/537.36',
       )
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) => setState(() => _isLoading = true),
-        onPageFinished: (_) => setState(() => _isLoading = false),
-        onWebResourceError: (_) => setState(() => _isLoading = false),
-      ))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) => setState(() => _isLoading = true),
+          onPageFinished: (_) => setState(() => _isLoading = false),
+          onWebResourceError: (_) => setState(() => _isLoading = false),
+        ),
+      )
       ..loadRequest(Uri.parse(widget.video.embedUrl));
 
     if (_controller.platform is AndroidWebViewController) {
@@ -346,7 +375,10 @@ class _WebViewScreenState extends State<_WebViewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.video.title, overflow: TextOverflow.ellipsis),
-        actions: [_AddToPackButton(video: widget.video)],
+        actions: [
+          if (context.watch<AppProvider>().ownsVideo(widget.video.id))
+            _AddToPackButton(video: widget.video),
+        ],
       ),
       body: Stack(
         children: [
@@ -380,44 +412,48 @@ class _AddToPackButton extends StatelessWidget {
     final packs = provider.packs;
 
     if (packs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.createPackFirst)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.createPackFirst)));
       return;
     }
 
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(l10n.addToPack,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 16)),
+            child: Text(
+              l10n.addToPack,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ),
-          ...packs.map((p) => ListTile(
-                leading: const Icon(Icons.folder_special_outlined),
-                title: Text(p.name),
-                trailing: p.videoIds.contains(video.id)
-                    ? const Icon(Icons.check, color: Colors.green)
-                    : null,
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final uid = FirebaseAuth.instance.currentUser?.uid;
-                  if (uid != null && !p.videoIds.contains(video.id)) {
-                    await provider.addVideoToPack(uid, p.id, video.id);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(l10n.addedToPack(p.name))),
-                      );
-                    }
+          ...packs.map(
+            (p) => ListTile(
+              leading: const Icon(Icons.folder_special_outlined),
+              title: Text(p.name),
+              trailing: p.videoIds.contains(video.id)
+                  ? const Icon(Icons.check, color: Colors.green)
+                  : null,
+              onTap: () async {
+                if (!popOnce(ctx)) return;
+                final uid = FirebaseAuth.instance.currentUser?.uid;
+                if (uid != null && !p.videoIds.contains(video.id)) {
+                  await provider.addVideoToPack(uid, p.id, video.id);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.addedToPack(p.name))),
+                    );
                   }
-                },
-              )),
+                }
+              },
+            ),
+          ),
           const SizedBox(height: 8),
         ],
       ),

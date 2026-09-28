@@ -18,12 +18,14 @@ import 'bubble_save.dart';
 import 'firebase_options.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'providers/app_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/community_pack_detail_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/firestore_service.dart';
 import 'services/metadata_service.dart';
 import 'theme.dart';
+import 'utils/tap_guard.dart';
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
 
@@ -32,8 +34,9 @@ class _SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: palette.bgPrimary,
       body: Column(
         children: [
           const Spacer(flex: 2),
@@ -49,7 +52,7 @@ class _SplashScreen extends StatelessWidget {
                 Text(
                   'Ascrollbox',
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: palette.textPrimary,
                     fontSize: 26,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.5,
@@ -59,7 +62,7 @@ class _SplashScreen extends StatelessWidget {
                 Text(
                   'Loading...',
                   style: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: palette.textSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                   ),
@@ -95,9 +98,7 @@ void main() async {
     // no-fill) inventory while developing — required by AdMob policy
     // to avoid invalid-traffic flags on real ad units.
     MobileAds.instance.updateRequestConfiguration(
-      RequestConfiguration(
-        testDeviceIds: ['CC8F02DE97F58A8D49E53A72612CD868'],
-      ),
+      RequestConfiguration(testDeviceIds: ['CC8F02DE97F58A8D49E53A72612CD868']),
     );
   }
 
@@ -106,19 +107,26 @@ void main() async {
   final isShare =
       WidgetsBinding.instance.platformDispatcher.defaultRouteName == '/share';
 
+  final themeProvider = await ThemeProvider.load();
+
   if (isShare) {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     await _activateAppCheck();
-    runApp(const _ShareApp());
+    runApp(_ShareApp(themeMode: themeProvider.mode));
     return;
   }
 
-  runApp(const _SplashApp());
+  runApp(_SplashApp(themeMode: themeProvider.mode));
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await _activateAppCheck();
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider.value(value: themeProvider),
+      ],
       child: const App(),
     ),
   );
@@ -137,13 +145,17 @@ Future<void> _activateAppCheck() async {
 // ── Normal app ────────────────────────────────────────────────────────────────
 
 class _SplashApp extends StatelessWidget {
-  const _SplashApp();
+  final ThemeMode themeMode;
+  const _SplashApp({required this.themeMode});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: _SplashScreen(),
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: themeMode,
+      home: const _SplashScreen(),
     );
   }
 }
@@ -194,7 +206,9 @@ class _AppState extends State<App> {
     }
 
     if (code != null && code.isNotEmpty) {
-      _openPackByCode(code.toUpperCase());
+      // The same link can arrive twice (initial link + stream) — open it once.
+      final upper = code.toUpperCase();
+      runOnce('openPackLink:$upper', () => _openPackByCode(upper));
     }
   }
 
@@ -247,7 +261,9 @@ class _AppState extends State<App> {
         Locale('de'),
         Locale('pt'),
       ],
-      theme: buildTheme(),
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: context.watch<ThemeProvider>().mode,
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.userChanges(),
         builder: (context, snapshot) {
@@ -266,13 +282,20 @@ class _AppState extends State<App> {
 // ── Share app (runs inside ShareActivity) ─────────────────────────────────────
 
 class _ShareApp extends StatelessWidget {
-  const _ShareApp();
+  final ThemeMode themeMode;
+  const _ShareApp({required this.themeMode});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: buildTheme().copyWith(scaffoldBackgroundColor: Colors.transparent),
+      theme: buildTheme(
+        Brightness.light,
+      ).copyWith(scaffoldBackgroundColor: Colors.transparent),
+      darkTheme: buildTheme(
+        Brightness.dark,
+      ).copyWith(scaffoldBackgroundColor: Colors.transparent),
+      themeMode: themeMode,
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

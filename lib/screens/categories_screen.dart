@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/tag_model.dart';
 import '../providers/app_provider.dart';
+import '../theme.dart';
+import '../utils/tap_guard.dart';
 
 class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
@@ -23,10 +25,9 @@ class CategoriesScreen extends StatelessWidget {
               children: [
                 Text(
                   l10n.labelsSectionMostUsed,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelLarge
-                      ?.copyWith(color: Colors.grey[600]),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: context.palette.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -44,8 +45,8 @@ class CategoriesScreen extends StatelessWidget {
                       count: count,
                       isActive: isActive,
                       onTap: () {
+                        if (!popOnce(context)) return;
                         provider.toggleFilterTag(tag);
-                        Navigator.pop(context);
                       },
                     );
                   }).toList(),
@@ -83,7 +84,9 @@ class _TagCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? scheme.primaryContainer : scheme.surfaceContainerHighest,
+          color: isActive
+              ? scheme.primaryContainer
+              : scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isActive ? scheme.primary : Colors.transparent,
@@ -108,7 +111,9 @@ class _TagCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: isActive ? scheme.primary : scheme.primary.withValues(alpha: 0.12),
+                color: isActive
+                    ? scheme.primary
+                    : scheme.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -135,23 +140,21 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.label_outline, size: 72, color: Colors.grey[300]),
+          Icon(Icons.label_outline, size: 72, color: context.palette.muted),
           const SizedBox(height: 16),
           Text(
             l10n.labelsEmpty,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: Colors.grey[500]),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: context.palette.textTertiary,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             l10n.labelsEmptySubtitle,
             textAlign: TextAlign.center,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: Colors.grey[400]),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: context.palette.textTertiary,
+            ),
           ),
         ],
       ),

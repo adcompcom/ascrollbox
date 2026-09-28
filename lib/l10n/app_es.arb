@@ -266,5 +266,9 @@
   "changePin": "Cambiar clave",
   "accountSection": "Cuenta",
   "nicknameTaken": "Este nombre de usuario ya está en uso",
-  "nicknameInvalid": "Solo letras, números, puntos y guiones bajos"
+  "nicknameInvalid": "Solo letras, números, puntos y guiones bajos",
+  "appearanceSection": "Apariencia",
+  "themeSystem": "Sistema",
+  "themeLight": "Claro",
+  "themeDark": "Oscuro"
 }

@@ -49,8 +49,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   // Public videos only — used everywhere except PrivateScreen
-  List<VideoModel> get videos =>
-      _allVideos.where((v) => !v.isPrivate).toList();
+  List<VideoModel> get videos => _allVideos.where((v) => !v.isPrivate).toList();
 
   // Private videos only — used by PrivateScreen
   List<VideoModel> get privateVideos =>
@@ -116,8 +115,7 @@ class AppProvider extends ChangeNotifier {
         result = result.reversed.toList();
         break;
       case SortOrder.byPlatform:
-        result = [...result]
-          ..sort((a, b) => a.platform.compareTo(b.platform));
+        result = [...result]..sort((a, b) => a.platform.compareTo(b.platform));
         break;
     }
 
@@ -159,7 +157,7 @@ class AppProvider extends ChangeNotifier {
 
       final thumbnailUrl = meta.thumbnailUrl.isNotEmpty
           ? (await StorageService().uploadThumbnail(uid, meta.thumbnailUrl) ??
-              meta.thumbnailUrl)
+                meta.thumbnailUrl)
           : '';
 
       final videoId = await _db.addVideo(
@@ -180,13 +178,11 @@ class AppProvider extends ChangeNotifier {
       );
 
       // Non-blocking audit writes — failures must not surface to the user
-      _db
-          .writeAuditLog(uid, 'video_added', 'video', videoId, {
-            'platform': meta.platform,
-            'isPrivate': isPrivate,
-            'source': source,
-          })
-          .ignore();
+      _db.writeAuditLog(uid, 'video_added', 'video', videoId, {
+        'platform': meta.platform,
+        'isPrivate': isPrivate,
+        'source': source,
+      }).ignore();
       _db.incrementUserVideoCount(uid, 1).ignore();
     } finally {
       isLoading = false;
@@ -204,12 +200,24 @@ class AppProvider extends ChangeNotifier {
       _db.updateVideo(uid, video);
 
   Future<void> updateVideoTags(
-          String uid, VideoModel video, List<String> tags) =>
-      _db.updateVideo(uid, video.copyWith(tags: tags));
+    String uid,
+    VideoModel video,
+    List<String> tags,
+  ) => _db.updateVideo(uid, video.copyWith(tags: tags));
 
-  Future<void> updateVideoNotes(
-          String uid, VideoModel video, String? notes) =>
-      _db.updateVideo(uid, video.copyWith(notes: notes));
+  Future<void> updateVideoNotes(String uid, VideoModel video, String? notes) =>
+      _db.updateVideoDetails(uid, video.id, notes: notes);
+
+  Future<void> updateVideoDetails(
+    String uid,
+    String videoId, {
+    required List<String> tags,
+    required String? notes,
+  }) => _db.updateVideoDetails(uid, videoId, tags: tags, notes: notes);
+
+  /// Whether [videoId] is in the user's own library (public or private) —
+  /// false for videos seen inside someone else's community pack.
+  bool ownsVideo(String videoId) => _allVideos.any((v) => v.id == videoId);
 
   Future<void> moveToPrivate(String uid, String videoId) =>
       _db.updateVideoPrivacy(uid, videoId, true);
@@ -254,19 +262,26 @@ class AppProvider extends ChangeNotifier {
       isPublic: isPublic,
       videos: videos,
     );
-    _db
-        .writeAuditLog(uid, 'pack_published', 'community_pack', cpId,
-            {'name': name, 'isPublic': isPublic})
-        .ignore();
+    _db.writeAuditLog(uid, 'pack_published', 'community_pack', cpId, {
+      'name': name,
+      'isPublic': isPublic,
+    }).ignore();
     return cpId;
   }
 
   Future<void> unpublishPack(
-      String uid, String packId, String communityPackId) async {
+    String uid,
+    String packId,
+    String communityPackId,
+  ) async {
     await _db.unpublishPack(uid, packId, communityPackId);
     _db
         .writeAuditLog(
-            uid, 'pack_unpublished', 'community_pack', communityPackId)
+          uid,
+          'pack_unpublished',
+          'community_pack',
+          communityPackId,
+        )
         .ignore();
   }
 
@@ -296,13 +311,11 @@ class AppProvider extends ChangeNotifier {
     String packId, {
     required String description,
     required List<String> tags,
-  }) =>
-      _db.updatePackMeta(uid, packId, description: description, tags: tags);
+  }) => _db.updatePackMeta(uid, packId, description: description, tags: tags);
 
   // ── Private PIN ───────────────────────────────────────────────
 
-  Future<String?> getPrivatePinHash(String uid) =>
-      _db.getPrivatePinHash(uid);
+  Future<String?> getPrivatePinHash(String uid) => _db.getPrivatePinHash(uid);
 
   Future<void> setPrivatePin(String uid, String pin) =>
       _db.setPrivatePinHash(uid, pin);
@@ -312,8 +325,13 @@ class AppProvider extends ChangeNotifier {
 
   // ── Packs ─────────────────────────────────────────────────────
 
-  Future<void> createPack(String uid, String name) async {
-    await _db.createPack(uid, name);
+  Future<void> createPack(
+    String uid,
+    String name, {
+    String description = '',
+    List<String> tags = const [],
+  }) async {
+    await _db.createPack(uid, name, description: description, tags: tags);
     _db.incrementUserPackCount(uid, 1).ignore();
   }
 
@@ -329,8 +347,7 @@ class AppProvider extends ChangeNotifier {
   Future<void> addVideoToPack(String uid, String packId, String videoId) =>
       _db.addVideoToPack(uid, packId, videoId);
 
-  Future<void> removeVideoFromPack(
-          String uid, String packId, String videoId) =>
+  Future<void> removeVideoFromPack(String uid, String packId, String videoId) =>
       _db.removeVideoFromPack(uid, packId, videoId);
 
   List<VideoModel> videosInPack(PackModel pack) =>
@@ -374,21 +391,25 @@ class AppProvider extends ChangeNotifier {
       userProfile = p;
       notifyListeners();
     });
-    _publicPacksSub =
-        _db.watchPublicCommunityPacks().handleError((_) {}).listen((p) {
-      publicCommunityPacks = p;
-      notifyListeners();
-    });
-    _savedPackIdsSub =
-        _db.watchSavedCommunityPackIds(user.uid).handleError((_) {}).listen(
-            (ids) async {
-      _savedCommunityPackIds = ids;
-      final futures = ids.map((id) => _db.getCommunityPack(id));
-      final results = await Future.wait(futures);
-      savedCommunityPacks =
-          results.whereType<CommunityPackModel>().toList();
-      notifyListeners();
-    });
+    _publicPacksSub = _db
+        .watchPublicCommunityPacks()
+        .handleError((_) {})
+        .listen((p) {
+          publicCommunityPacks = p;
+          notifyListeners();
+        });
+    _savedPackIdsSub = _db
+        .watchSavedCommunityPackIds(user.uid)
+        .handleError((_) {})
+        .listen((ids) async {
+          _savedCommunityPackIds = ids;
+          final futures = ids.map((id) => _db.getCommunityPack(id));
+          final results = await Future.wait(futures);
+          savedCommunityPacks = results
+              .whereType<CommunityPackModel>()
+              .toList();
+          notifyListeners();
+        });
   }
 
   void _clear() {

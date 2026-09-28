@@ -266,5 +266,9 @@
   "changePin": "Alterar PIN",
   "accountSection": "Conta",
   "nicknameTaken": "Este apelido já está em uso",
-  "nicknameInvalid": "Somente letras, números, pontos e sublinhados são permitidos"
+  "nicknameInvalid": "Somente letras, números, pontos e sublinhados são permitidos",
+  "appearanceSection": "Aparência",
+  "themeSystem": "Sistema",
+  "themeLight": "Claro",
+  "themeDark": "Escuro"
 }

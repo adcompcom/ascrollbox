@@ -800,4 +800,16 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get nicknameInvalid =>
       'Nur Buchstaben, Zahlen, Punkte und Unterstriche erlaubt';
+
+  @override
+  String get appearanceSection => 'Darstellung';
+
+  @override
+  String get themeSystem => 'System';
+
+  @override
+  String get themeLight => 'Hell';
+
+  @override
+  String get themeDark => 'Dunkel';
 }

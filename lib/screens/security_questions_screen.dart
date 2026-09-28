@@ -4,6 +4,7 @@ import '../l10n/generated/app_localizations.dart';
 import '../models/security_question_model.dart';
 import '../services/firestore_service.dart';
 import 'pin_entry_screen.dart';
+import '../theme.dart';
 
 // ── Setup mode ────────────────────────────────────────────────────────────────
 
@@ -20,7 +21,10 @@ class SecurityQuestionsSetupScreen extends StatefulWidget {
 class _SecurityQuestionsSetupScreenState
     extends State<SecurityQuestionsSetupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _answers = List<TextEditingController>.generate(3, (_) => TextEditingController());
+  final _answers = List<TextEditingController>.generate(
+    3,
+    (_) => TextEditingController(),
+  );
   final _selected = List<String?>.filled(3, null, growable: false);
   bool _saving = false;
   String? _errorMsg;
@@ -34,6 +38,7 @@ class _SecurityQuestionsSetupScreenState
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     final l10n = AppLocalizations.of(context);
     setState(() => _errorMsg = null);
 
@@ -50,13 +55,21 @@ class _SecurityQuestionsSetupScreenState
     }
 
     setState(() => _saving = true);
-    final questions = List.generate(3, (i) => {
-          'questionId': _selected[i]!,
-          'answerHash': FirestoreService.hashAnswer(_answers[i].text),
-        });
-    await FirestoreService().saveSecurityQuestions(widget.uid, questions);
-
-    if (mounted) Navigator.pop(context, true);
+    final questions = List.generate(
+      3,
+      (i) => {
+        'questionId': _selected[i]!,
+        'answerHash': FirestoreService.hashAnswer(_answers[i].text),
+      },
+    );
+    try {
+      await FirestoreService().saveSecurityQuestions(widget.uid, questions);
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      // Let the user retry instead of leaving the button stuck on a spinner.
+      if (mounted) setState(() => _saving = false);
+      rethrow;
+    }
   }
 
   @override
@@ -74,20 +87,27 @@ class _SecurityQuestionsSetupScreenState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
           children: [
-            Icon(Icons.shield_outlined, size: 48, color: theme.colorScheme.primary),
+            Icon(
+              Icons.shield_outlined,
+              size: 48,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(height: 12),
             Text(
               l10n.sqSetupSubtitle,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: context.palette.textSecondary,
+              ),
             ),
             const SizedBox(height: 28),
 
             for (int i = 0; i < 3; i++) ...[
               Text(
                 '${i + 1}.',
-                style: theme.textTheme.labelLarge
-                    ?.copyWith(color: theme.colorScheme.primary),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
               ),
               const SizedBox(height: 6),
               // Question dropdown
@@ -97,18 +117,22 @@ class _SecurityQuestionsSetupScreenState
                 isExpanded: true,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   isDense: true,
                 ),
                 items: kSecurityQuestions
-                    .map((q) => DropdownMenuItem(
-                          value: q.id,
-                          child: Text(
-                            q.label(l10n),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ))
+                    .map(
+                      (q) => DropdownMenuItem(
+                        value: q.id,
+                        child: Text(
+                          q.label(l10n),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) => setState(() => _selected[i] = v),
               ),
@@ -119,8 +143,10 @@ class _SecurityQuestionsSetupScreenState
                 decoration: InputDecoration(
                   hintText: l10n.sqAnswerHint,
                   border: const OutlineInputBorder(),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   isDense: true,
                 ),
                 textCapitalization: TextCapitalization.none,
@@ -139,10 +165,7 @@ class _SecurityQuestionsSetupScreenState
 
             _saving
                 ? const Center(child: CircularProgressIndicator())
-                : FilledButton(
-                    onPressed: _save,
-                    child: Text(l10n.sqSave),
-                  ),
+                : FilledButton(onPressed: _save, child: Text(l10n.sqSave)),
           ],
         ),
       ),
@@ -165,7 +188,10 @@ class SecurityQuestionsVerifyScreen extends StatefulWidget {
 class _SecurityQuestionsVerifyScreenState
     extends State<SecurityQuestionsVerifyScreen> {
   List<Map<String, dynamic>>? _questions;
-  final _answers = List<TextEditingController>.generate(3, (_) => TextEditingController());
+  final _answers = List<TextEditingController>.generate(
+    3,
+    (_) => TextEditingController(),
+  );
   bool _loading = true;
   bool _saving = false;
   bool _error = false;
@@ -186,11 +212,15 @@ class _SecurityQuestionsVerifyScreenState
 
   Future<void> _load() async {
     final qs = await FirestoreService().getSecurityQuestions(widget.uid);
-    if (mounted) setState(() { _questions = qs; _loading = false; });
+    if (mounted)
+      setState(() {
+        _questions = qs;
+        _loading = false;
+      });
   }
 
   Future<void> _verify() async {
-    if (_questions == null) return;
+    if (_questions == null || _saving) return;
 
     final allCorrect = List.generate(3, (i) {
       final stored = _questions![i]['answerHash'] as String;
@@ -200,13 +230,16 @@ class _SecurityQuestionsVerifyScreenState
     if (!allCorrect) {
       setState(() {
         _error = true;
-        for (final c in _answers) { c.clear(); }
+        for (final c in _answers) {
+          c.clear();
+        }
       });
       return;
     }
 
     // Answers correct → go to PIN reset
     if (!mounted) return;
+    setState(() => _saving = true);
     await Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -231,23 +264,27 @@ class _SecurityQuestionsVerifyScreenState
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
               children: [
-                Icon(Icons.shield_outlined,
-                    size: 48, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.shield_outlined,
+                  size: 48,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   l10n.sqVerifySubtitle,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: Colors.grey[600]),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: context.palette.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 28),
 
                 for (int i = 0; i < (_questions?.length ?? 0); i++) ...[
                   Text(
-                    questionLabel(
-                        _questions![i]['questionId'] as String, l10n),
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    questionLabel(_questions![i]['questionId'] as String, l10n),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   TextField(
@@ -256,7 +293,9 @@ class _SecurityQuestionsVerifyScreenState
                       hintText: l10n.sqAnswerHint,
                       border: const OutlineInputBorder(),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       isDense: true,
                       errorText: _error ? '' : null,
                     ),

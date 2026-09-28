@@ -8,6 +8,8 @@ import '../l10n/generated/app_localizations.dart';
 import '../models/pack_model.dart';
 import '../providers/app_provider.dart';
 import '../services/firestore_service.dart';
+import '../theme.dart';
+import '../utils/tap_guard.dart';
 
 class PackPublishScreen extends StatefulWidget {
   final PackModel pack;
@@ -66,6 +68,7 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
   }
 
   Future<void> _publish() async {
+    if (_loading) return;
     setState(() => _loading = true);
     final user = FirebaseAuth.instance.currentUser!;
     final provider = context.read<AppProvider>();
@@ -97,19 +100,26 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
     }
   }
 
-  Future<void> _unpublish() async {
+  Future<void> _unpublish() =>
+      runOnce('unpublish:${widget.pack.id}', _unpublishImpl);
+
+  Future<void> _unpublishImpl() async {
+    if (_loading) return;
     final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text(l10n.packUnpublish),
-        content: const Text('¿Seguro que quieres dejar de compartir este pack?'),
+        content: const Text(
+          '¿Seguro que quieres dejar de compartir este pack?',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(l10n.cancel)),
+            onPressed: () => popOnce(ctx, false),
+            child: Text(l10n.cancel),
+          ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => popOnce(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: Text(l10n.confirm),
           ),
@@ -120,10 +130,10 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
     setState(() => _loading = true);
     try {
       await context.read<AppProvider>().unpublishPack(
-            FirebaseAuth.instance.currentUser!.uid,
-            widget.pack.id,
-            widget.pack.communityPackId!,
-          );
+        FirebaseAuth.instance.currentUser!.uid,
+        widget.pack.id,
+        widget.pack.communityPackId!,
+      );
       if (mounted) Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -144,8 +154,10 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
           if (isPublished)
             TextButton(
               onPressed: _loading ? null : _unpublish,
-              child: Text(l10n.packUnpublish,
-                  style: const TextStyle(color: Colors.red)),
+              child: Text(
+                l10n.packUnpublish,
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
         ],
       ),
@@ -164,14 +176,20 @@ class _PackPublishScreenState extends State<PackPublishScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.pack.name,
-                          style: theme.textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold)),
+                      Text(
+                        widget.pack.name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       if (widget.pack.description.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text(widget.pack.description,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(color: Colors.grey[600])),
+                        Text(
+                          widget.pack.description,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: context.palette.textSecondary,
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -226,11 +244,10 @@ class _ShareCodeCard extends StatelessWidget {
 
   String get _link => '$_baseUrl$code';
 
-  Future<void> _share() async {
-    await Share.share(
-      '🎬 Mira este pack en Ascrollbox: "$packName"\n\n$_link',
-    );
-  }
+  Future<void> _share() => runOnce(
+    'sharePack:$code',
+    () => Share.share('🎬 Mira este pack en Ascrollbox: "$packName"\n\n$_link'),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -254,9 +271,12 @@ class _ShareCodeCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.packShareCode,
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(color: theme.colorScheme.primary)),
+                    Text(
+                      l10n.packShareCode,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
                     Text(
                       code,
                       style: theme.textTheme.headlineSmall?.copyWith(
@@ -305,9 +325,9 @@ class _ShareCodeCard extends StatelessWidget {
                 tooltip: 'Copiar link',
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _link));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Link copiado')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Link copiado')));
                 },
               ),
             ],

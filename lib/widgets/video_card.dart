@@ -4,6 +4,7 @@ import '../l10n/generated/app_localizations.dart';
 import '../models/tag_model.dart';
 import '../models/video_model.dart';
 import '../theme.dart';
+import '../utils/tap_guard.dart';
 
 class VideoCard extends StatelessWidget {
   final VideoModel video;
@@ -34,7 +35,7 @@ class VideoCard extends StatelessWidget {
       onLongPress: () => _showOptions(context),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.bgPrimary,
+          color: context.palette.bgPrimary,
           borderRadius: BorderRadius.circular(12),
           boxShadow: const [
             BoxShadow(
@@ -65,10 +66,10 @@ class VideoCard extends StatelessWidget {
                         video.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: context.palette.textPrimary,
                           height: 1.3,
                         ),
                       ),
@@ -82,9 +83,9 @@ class VideoCard extends StatelessWidget {
                           video.notes!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textTertiary,
+                            color: context.palette.textTertiary,
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -104,7 +105,7 @@ class VideoCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
-      builder: (_) => SafeArea(
+      builder: (sheetCtx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -113,8 +114,7 @@ class VideoCard extends StatelessWidget {
               leading: const Icon(Icons.play_circle_outline),
               title: Text(l10n.play),
               onTap: () {
-                Navigator.pop(context);
-                onTap();
+                if (popOnce(sheetCtx)) onTap();
               },
             ),
             if (onEdit != null)
@@ -122,8 +122,7 @@ class VideoCard extends StatelessWidget {
                 leading: const Icon(Icons.edit_outlined),
                 title: Text(l10n.editVideo),
                 onTap: () {
-                  Navigator.pop(context);
-                  onEdit!();
+                  if (popOnce(sheetCtx)) onEdit!();
                 },
               ),
             if (onAddToPack != null)
@@ -131,8 +130,7 @@ class VideoCard extends StatelessWidget {
                 leading: const Icon(Icons.folder_special_outlined),
                 title: Text(l10n.addToPack),
                 onTap: () {
-                  Navigator.pop(context);
-                  onAddToPack!();
+                  if (popOnce(sheetCtx)) onAddToPack!();
                 },
               ),
             if (onMoveToPrivate != null)
@@ -140,8 +138,7 @@ class VideoCard extends StatelessWidget {
                 leading: const Icon(Icons.lock_outline),
                 title: Text(l10n.moveToPrivate),
                 onTap: () {
-                  Navigator.pop(context);
-                  onMoveToPrivate!();
+                  if (popOnce(sheetCtx)) onMoveToPrivate!();
                 },
               ),
             if (onMoveToPublic != null)
@@ -149,30 +146,32 @@ class VideoCard extends StatelessWidget {
                 leading: const Icon(Icons.lock_open_outlined),
                 title: Text(l10n.moveToHome),
                 onTap: () {
-                  Navigator.pop(context);
-                  onMoveToPublic!();
+                  if (popOnce(sheetCtx)) onMoveToPublic!();
                 },
               ),
             if (onRemoveFromPack != null)
               ListTile(
-                leading: const Icon(Icons.remove_circle_outline,
-                    color: AppColors.red),
-                title: Text(l10n.removeFromPack,
-                    style: const TextStyle(color: AppColors.red)),
+                leading: const Icon(
+                  Icons.remove_circle_outline,
+                  color: AppColors.red,
+                ),
+                title: Text(
+                  l10n.removeFromPack,
+                  style: const TextStyle(color: AppColors.red),
+                ),
                 onTap: () {
-                  Navigator.pop(context);
-                  onRemoveFromPack!();
+                  if (popOnce(sheetCtx)) onRemoveFromPack!();
                 },
               ),
             if (onDelete != null)
               ListTile(
-                leading: const Icon(Icons.delete_outline,
-                    color: AppColors.red),
-                title: Text(l10n.delete,
-                    style: const TextStyle(color: AppColors.red)),
+                leading: const Icon(Icons.delete_outline, color: AppColors.red),
+                title: Text(
+                  l10n.delete,
+                  style: const TextStyle(color: AppColors.red),
+                ),
                 onTap: () {
-                  Navigator.pop(context);
-                  onDelete!();
+                  if (popOnce(sheetCtx)) onDelete!();
                 },
               ),
             const SizedBox(height: 8),
@@ -199,10 +198,10 @@ class _Thumbnail extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: video.thumbnailUrl,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => _placeholder(),
-                errorWidget: (_, _, _) => _placeholder(),
+                placeholder: (_, _) => _placeholder(context),
+                errorWidget: (_, _, _) => _placeholder(context),
               )
-            : _placeholder(),
+            : _placeholder(context),
         // Overlay oscuro sutil
         const DecoratedBox(
           decoration: BoxDecoration(
@@ -216,8 +215,11 @@ class _Thumbnail extends StatelessWidget {
         ),
         // Icono play centrado
         const Center(
-          child: Icon(Icons.play_circle_fill,
-              size: 32, color: Color(0xB3FFFFFF)),
+          child: Icon(
+            Icons.play_circle_fill,
+            size: 32,
+            color: Color(0xB3FFFFFF),
+          ),
         ),
         // Badge de plataforma — esquina inferior derecha
         Positioned(
@@ -229,11 +231,14 @@ class _Thumbnail extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() => Container(
-        color: AppColors.bgTertiary,
-        child: const Icon(Icons.ondemand_video,
-            size: 36, color: AppColors.textTertiary),
-      );
+  Widget _placeholder(BuildContext context) => Container(
+    color: context.palette.bgTertiary,
+    child: Icon(
+      Icons.ondemand_video,
+      size: 36,
+      color: context.palette.textTertiary,
+    ),
+  );
 }
 
 // ── Badge de plataforma (overlay en thumbnail) ────────────────────────────────
@@ -245,11 +250,11 @@ class _PlatformBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (platform) {
-      'youtube'   => ('YT', AppColors.red),
-      'facebook'  => ('FB', AppColors.red),
-      'tiktok'    => ('TK', AppColors.blue),
+      'youtube' => ('YT', AppColors.red),
+      'facebook' => ('FB', AppColors.red),
+      'tiktok' => ('TK', AppColors.blue),
       'instagram' => ('IG', AppColors.blue),
-      _           => ('••', AppColors.textSecondary),
+      _ => ('••', context.palette.textSecondary),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
@@ -287,14 +292,14 @@ class _TagsRow extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: AppColors.bgTertiary,
+            color: context.palette.bgTertiary,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
             emoji != null ? '$emoji $name' : name,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
-              color: AppColors.textSecondary,
+              color: context.palette.textSecondary,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.2,
             ),
@@ -310,14 +315,14 @@ class _TagsRow extends StatelessWidget {
 class _SheetHandle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
-        child: Container(
-          margin: const EdgeInsets.only(top: 10, bottom: 4),
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: AppColors.bgTertiary,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      );
+    child: Container(
+      margin: const EdgeInsets.only(top: 10, bottom: 4),
+      width: 36,
+      height: 4,
+      decoration: BoxDecoration(
+        color: context.palette.bgTertiary,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    ),
+  );
 }

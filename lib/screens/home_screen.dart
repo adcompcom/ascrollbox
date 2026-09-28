@@ -19,6 +19,8 @@ import 'pin_entry_screen.dart';
 import 'private_screen.dart';
 import 'settings_screen.dart';
 import 'video_player_screen.dart';
+import '../theme.dart';
+import '../utils/tap_guard.dart';
 
 class HomeScreen extends StatefulWidget {
   final User user;
@@ -39,17 +41,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Save dialog ───────────────────────────────────────────────
 
-  Future<void> _moveToPrivate(VideoModel video) async {
-    final l10n = AppLocalizations.of(context);
-    await context.read<AppProvider>().moveToPrivate(widget.user.uid, video.id);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.movedToPrivate)),
-      );
-    }
-  }
+  Future<void> _moveToPrivate(VideoModel video) =>
+      runOnce('moveToPrivate:${video.id}', () async {
+        final l10n = AppLocalizations.of(context);
+        await context.read<AppProvider>().moveToPrivate(
+          widget.user.uid,
+          video.id,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.movedToPrivate)));
+        }
+      });
 
-  Future<void> _openPrivateSection() async {
+  Future<void> _openPrivateSection() =>
+      runOnce('openPrivateSection', _openPrivateSectionImpl);
+
+  Future<void> _openPrivateSectionImpl() async {
     final uid = widget.user.uid;
     final hash = await FirestoreService().getPrivatePinHash(uid);
     if (!mounted) return;
@@ -71,72 +80,91 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _confirmDelete(VideoModel video) async {
-    final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(l10n.deleteVideo),
-        content: Text(l10n.deleteVideoConfirm(video.title)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(l10n.cancel)),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.delete,
-                style: const TextStyle(color: Colors.red)),
+  Future<void> _confirmDelete(VideoModel video) =>
+      runOnce('deleteVideo:${video.id}', () async {
+        final l10n = AppLocalizations.of(context);
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.deleteVideo),
+            content: Text(l10n.deleteVideoConfirm(video.title)),
+            actions: [
+              TextButton(
+                onPressed: () => popOnce(ctx, false),
+                child: Text(l10n.cancel),
+              ),
+              TextButton(
+                onPressed: () => popOnce(ctx, true),
+                child: Text(
+                  l10n.delete,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      await context.read<AppProvider>().deleteVideo(widget.user.uid, video.id);
-    }
-  }
+        );
+        if (confirmed == true && mounted) {
+          final messenger = ScaffoldMessenger.of(context);
+          try {
+            await context.read<AppProvider>().deleteVideo(
+              widget.user.uid,
+              video.id,
+            );
+          } catch (e) {
+            messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+          }
+        }
+      });
 
   void _showAddToPackDialog(VideoModel video) {
     final l10n = AppLocalizations.of(context);
     final provider = context.read<AppProvider>();
     final packs = provider.packs;
     if (packs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.createPackFirst)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.createPackFirst)));
       return;
     }
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Column(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(l10n.addToPack,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            child: Text(
+              l10n.addToPack,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ),
-          ...packs.map((p) => ListTile(
-                leading: const Icon(Icons.folder_special_outlined),
-                title: Text(p.name),
-                trailing: p.videoIds.contains(video.id)
-                    ? const Icon(Icons.check, color: Colors.green)
-                    : null,
-                onTap: () async {
-                  Navigator.pop(context);
-                  if (!p.videoIds.contains(video.id)) {
-                    await provider.addVideoToPack(
-                        widget.user.uid, p.id, video.id);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(l10n.addedToPack(p.name))),
-                      );
-                    }
+          ...packs.map(
+            (p) => ListTile(
+              leading: const Icon(Icons.folder_special_outlined),
+              title: Text(p.name),
+              trailing: p.videoIds.contains(video.id)
+                  ? const Icon(Icons.check, color: Colors.green)
+                  : null,
+              onTap: () async {
+                if (!popOnce(ctx)) return;
+                if (!p.videoIds.contains(video.id)) {
+                  await provider.addVideoToPack(
+                    widget.user.uid,
+                    p.id,
+                    video.id,
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.addedToPack(p.name))),
+                    );
                   }
-                },
-              )),
+                }
+              },
+            ),
+          ),
           const SizedBox(height: 8),
         ],
       ),
@@ -150,9 +178,11 @@ class _HomeScreenState extends State<HomeScreen> {
       video: video,
       onSave: (tags, notes) async {
         Navigator.pop(context);
-        await provider.updateVideo(
+        await provider.updateVideoDetails(
           widget.user.uid,
-          video.copyWith(tags: tags, notes: notes.isEmpty ? null : notes),
+          video.id,
+          tags: tags,
+          notes: notes,
         );
       },
       onCancel: () => Navigator.pop(context),
@@ -177,8 +207,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Image.asset('assets/icon.png', height: 34, width: 34),
             ),
             const SizedBox(width: 10),
-            const Text('Ascrollbox',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const Text(
+              'Ascrollbox',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ],
         ),
         actions: [
@@ -195,42 +227,54 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (_) => [
               PopupMenuItem(
                 value: SortOrder.newest,
-                child: Row(children: [
-                  if (provider.sortOrder == SortOrder.newest)
-                    Icon(Icons.check,
+                child: Row(
+                  children: [
+                    if (provider.sortOrder == SortOrder.newest)
+                      Icon(
+                        Icons.check,
                         size: 16,
-                        color: Theme.of(context).colorScheme.primary),
-                  if (provider.sortOrder != SortOrder.newest)
-                    const SizedBox(width: 16),
-                  const SizedBox(width: 8),
-                  Text(l10n.sortNewest),
-                ]),
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    if (provider.sortOrder != SortOrder.newest)
+                      const SizedBox(width: 16),
+                    const SizedBox(width: 8),
+                    Text(l10n.sortNewest),
+                  ],
+                ),
               ),
               PopupMenuItem(
                 value: SortOrder.oldest,
-                child: Row(children: [
-                  if (provider.sortOrder == SortOrder.oldest)
-                    Icon(Icons.check,
+                child: Row(
+                  children: [
+                    if (provider.sortOrder == SortOrder.oldest)
+                      Icon(
+                        Icons.check,
                         size: 16,
-                        color: Theme.of(context).colorScheme.primary),
-                  if (provider.sortOrder != SortOrder.oldest)
-                    const SizedBox(width: 16),
-                  const SizedBox(width: 8),
-                  Text(l10n.sortOldest),
-                ]),
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    if (provider.sortOrder != SortOrder.oldest)
+                      const SizedBox(width: 16),
+                    const SizedBox(width: 8),
+                    Text(l10n.sortOldest),
+                  ],
+                ),
               ),
               PopupMenuItem(
                 value: SortOrder.byPlatform,
-                child: Row(children: [
-                  if (provider.sortOrder == SortOrder.byPlatform)
-                    Icon(Icons.check,
+                child: Row(
+                  children: [
+                    if (provider.sortOrder == SortOrder.byPlatform)
+                      Icon(
+                        Icons.check,
                         size: 16,
-                        color: Theme.of(context).colorScheme.primary),
-                  if (provider.sortOrder != SortOrder.byPlatform)
-                    const SizedBox(width: 16),
-                  const SizedBox(width: 8),
-                  Text(l10n.sortByPlatform),
-                ]),
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    if (provider.sortOrder != SortOrder.byPlatform)
+                      const SizedBox(width: 16),
+                    const SizedBox(width: 8),
+                    Text(l10n.sortByPlatform),
+                  ],
+                ),
               ),
             ],
           ),
@@ -246,8 +290,11 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: l10n.searchHint,
-                hintStyle: TextStyle(color: Colors.grey[500]),
-                prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
+                hintStyle: TextStyle(color: context.palette.textTertiary),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: context.palette.textTertiary,
+                ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear),
@@ -258,7 +305,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -289,20 +338,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.all(12),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.72,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                    ),
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.72,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
                     itemCount: videos.length,
                     itemBuilder: (_, i) {
                       final video = videos[i];
                       return VideoCard(
                         video: video,
-                        onTap: () => Navigator.push(
+                        onTap: () => pushOnce(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => VideoPlayerScreen(video: video)),
+                            builder: (_) => VideoPlayerScreen(video: video),
+                          ),
                         ),
                         onDelete: () => _confirmDelete(video),
                         onAddToPack: () => _showAddToPackDialog(video),
@@ -359,8 +409,9 @@ class _TagFilterBar extends StatelessWidget {
           ...usedTags.map((tag) {
             final emoji = kTagEmoji[tag];
             final localizedName = tag.localized(context);
-            final label =
-                emoji != null ? '$emoji $localizedName' : localizedName;
+            final label = emoji != null
+                ? '$emoji $localizedName'
+                : localizedName;
             return Padding(
               padding: const EdgeInsets.only(right: 6),
               child: FilterChip(
@@ -407,69 +458,65 @@ class _AppDrawer extends StatelessWidget {
             accountName: Text(displayName),
             accountEmail: Text(user.email ?? ''),
             currentAccountPicture: CircleAvatar(
-              backgroundImage:
-                  photoUrl != null ? NetworkImage(photoUrl) : null,
+              backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
               child: photoUrl == null
-                  ? Text(displayName[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 22))
+                  ? Text(
+                      displayName[0].toUpperCase(),
+                      style: const TextStyle(fontSize: 22),
+                    )
                   : null,
             ),
           ),
           ListTile(
             leading: const Icon(Icons.home_outlined),
             title: Text(l10n.home),
-            onTap: () => Navigator.pop(context),
+            onTap: () => Scaffold.of(context).closeDrawer(),
           ),
           ListTile(
             leading: const Icon(Icons.label_outline),
             title: Text(l10n.labelsTitle),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const CategoriesScreen()));
-            },
+            onTap: () => _open(context, const CategoriesScreen()),
           ),
           ListTile(
             leading: const Icon(Icons.folder_special_outlined),
             title: Text(l10n.packsTitle),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const PacksScreen()));
-            },
+            onTap: () => _open(context, const PacksScreen()),
           ),
           ListTile(
             leading: const Icon(Icons.lock_outline),
             title: Text(l10n.privateTitle),
             onTap: () {
-              Navigator.pop(context);
+              // closeDrawer (not Navigator.pop) so a second tap while the
+              // drawer is closing can't pop the home route itself.
+              Scaffold.of(context).closeDrawer();
               onPrivateTap();
             },
           ),
           ListTile(
             leading: const Icon(Icons.settings_outlined),
             title: Text(l10n.settings),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => SettingsScreen(user: user)),
-              );
-            },
+            onTap: () => _open(context, SettingsScreen(user: user)),
           ),
           const Divider(),
           const Spacer(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
-            title: Text(l10n.signOut,
-                style: const TextStyle(color: Colors.red)),
-            onTap: () => AuthService().signOut(),
+            title: Text(
+              l10n.signOut,
+              style: const TextStyle(color: Colors.red),
+            ),
+            onTap: () => runOnce('signOut', AuthService().signOut),
           ),
           const SizedBox(height: 8),
         ],
       ),
     );
+  }
+
+  void _open(BuildContext context, Widget page) {
+    if (!isTopRoute(context)) return;
+    Scaffold.of(context).closeDrawer();
+    pushOnce(context, MaterialPageRoute(builder: (_) => page));
   }
 }
 
@@ -503,20 +550,20 @@ class _EmptyState extends StatelessWidget {
                   l10n.noVideosSaved,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        height: 1.2,
-                      ),
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1.2,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
                 l10n.sharePrompt,
                 textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: Colors.grey[500], height: 1.4),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.palette.textTertiary,
+                  height: 1.4,
+                ),
               ),
             ],
           ),
@@ -529,14 +576,13 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.filter_list_off, size: 72, color: Colors.grey[300]),
+          Icon(Icons.filter_list_off, size: 72, color: context.palette.muted),
           const SizedBox(height: 16),
           Text(
             l10n.noResults,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: Colors.grey[500]),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: context.palette.textTertiary,
+            ),
           ),
         ],
       ),
@@ -556,7 +602,8 @@ Future<void> showSaveSheet(
     context: context,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
     builder: (ctx) => Padding(
       // Push sheet content above keyboard when it appears
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
@@ -600,7 +647,15 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
   List<String> _suggested = [];
   bool _suggesting = true;
   bool _isPrivate = false;
+  bool _closed = false; // Save/Cancel already tapped
   final _customController = TextEditingController();
+
+  void _closeOnce(VoidCallback action) {
+    if (_closed) return;
+    _closed = true;
+    action();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -644,9 +699,9 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
     final tag = _customController.text.trim().toLowerCase();
     if (tag.isEmpty) return;
     if (_selected.length >= _maxTags) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.labelsMaxReached)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.labelsMaxReached)));
       return;
     }
     setState(() {
@@ -673,7 +728,7 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: context.palette.muted,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -684,8 +739,11 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(6),
-                      child: Image.asset('assets/icon.png',
-                          width: 28, height: 28),
+                      child: Image.asset(
+                        'assets/icon.png',
+                        width: 28,
+                        height: 28,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -693,7 +751,7 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
-                        color: Colors.grey[800],
+                        color: context.palette.textPrimary,
                       ),
                     ),
                   ],
@@ -715,19 +773,25 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                   children: [
                     Row(
                       children: [
-                        Text(l10n.labelsTitle,
-                            style: Theme.of(context).textTheme.titleSmall),
+                        Text(
+                          l10n.labelsTitle,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
                         const SizedBox(width: 8),
                         if (_suggesting)
                           const SizedBox(
-                              width: 12,
-                              height: 12,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2))
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         else
-                          Text(l10n.labelsRemaining(remaining),
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey[500])),
+                          Text(
+                            l10n.labelsRemaining(remaining),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.palette.textTertiary,
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -740,7 +804,8 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                           final localizedName = tag.localized(context);
                           return Chip(
                             label: Text(
-                                '${emoji.isNotEmpty ? '$emoji ' : ''}$localizedName'),
+                              '${emoji.isNotEmpty ? '$emoji ' : ''}$localizedName',
+                            ),
                             deleteIcon: const Icon(Icons.close, size: 14),
                             onDeleted: () => _toggle(tag),
                             materialTapTargetSize:
@@ -759,7 +824,9 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                               hintText: l10n.labelsCustomPlaceholder,
                               border: const OutlineInputBorder(),
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                               isDense: true,
                             ),
                             onSubmitted: (_) => _addCustom(),
@@ -771,7 +838,8 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                           onPressed: _addCustom,
                           icon: const Icon(Icons.add),
                           style: IconButton.styleFrom(
-                              minimumSize: const Size(40, 40)),
+                            minimumSize: const Size(40, 40),
+                          ),
                         ),
                       ],
                     ),
@@ -795,10 +863,14 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
         ),
         Container(
           padding: EdgeInsets.fromLTRB(
-              16, 8, 16, MediaQuery.of(context).padding.bottom + 8),
+            16,
+            8,
+            16,
+            MediaQuery.of(context).padding.bottom + 8,
+          ),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+            border: Border(top: BorderSide(color: context.palette.bgTertiary)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -811,7 +883,7 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                     size: 18,
                     color: _isPrivate
                         ? Theme.of(context).colorScheme.primary
-                        : Colors.grey[500],
+                        : context.palette.textTertiary,
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -820,7 +892,7 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                       fontSize: 14,
                       color: _isPrivate
                           ? Theme.of(context).colorScheme.primary
-                          : Colors.grey[700],
+                          : context.palette.textSecondary,
                       fontWeight: _isPrivate
                           ? FontWeight.w600
                           : FontWeight.normal,
@@ -838,15 +910,16 @@ class _SaveVideoSheetState extends State<_SaveVideoSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: widget.onCancel,
+                      onPressed: () => _closeOnce(widget.onCancel),
                       child: Text(l10n.cancel),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton(
-                      onPressed: () =>
-                          widget.onSave(_selected.toList(), _isPrivate),
+                      onPressed: () => _closeOnce(
+                        () => widget.onSave(_selected.toList(), _isPrivate),
+                      ),
                       child: Text(l10n.save),
                     ),
                   ),
@@ -872,7 +945,8 @@ Future<void> showEditSheet(
     context: context,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
     builder: (_) => DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.7,
@@ -910,13 +984,19 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
   late final Set<String> _selected;
   late final TextEditingController _notesController;
   final _customController = TextEditingController();
+  bool _closed = false; // Save/Cancel already tapped
+
+  void _closeOnce(VoidCallback action) {
+    if (_closed) return;
+    _closed = true;
+    action();
+  }
 
   @override
   void initState() {
     super.initState();
     _selected = Set.from(widget.video.tags);
-    _notesController =
-        TextEditingController(text: widget.video.notes ?? '');
+    _notesController = TextEditingController(text: widget.video.notes ?? '');
   }
 
   @override
@@ -941,9 +1021,9 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
     final tag = _customController.text.trim().toLowerCase();
     if (tag.isEmpty) return;
     if (_selected.length >= _maxTags) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.labelsMaxReached)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.labelsMaxReached)));
       return;
     }
     setState(() {
@@ -966,7 +1046,7 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: context.palette.muted,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -979,11 +1059,12 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Title
-                Text(l10n.editVideo,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  l10n.editVideo,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 12),
 
                 // Notes field
@@ -1004,12 +1085,18 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
                 // Tags header + counter
                 Row(
                   children: [
-                    Text(l10n.labelsTitle,
-                        style: Theme.of(context).textTheme.titleSmall),
+                    Text(
+                      l10n.labelsTitle,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
                     const SizedBox(width: 8),
-                    Text(l10n.labelsRemaining(remaining),
-                        style:
-                            TextStyle(fontSize: 11, color: Colors.grey[500])),
+                    Text(
+                      l10n.labelsRemaining(remaining),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.palette.textTertiary,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -1024,7 +1111,8 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
                       final localizedName = tag.localized(context);
                       return Chip(
                         label: Text(
-                            '${emoji.isNotEmpty ? '$emoji ' : ''}$localizedName'),
+                          '${emoji.isNotEmpty ? '$emoji ' : ''}$localizedName',
+                        ),
                         deleteIcon: const Icon(Icons.close, size: 14),
                         onDeleted: () => _toggle(tag),
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1044,7 +1132,9 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
                           hintText: l10n.labelsCustomPlaceholder,
                           border: const OutlineInputBorder(),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           isDense: true,
                         ),
                         onSubmitted: (_) => _addCustom(),
@@ -1056,7 +1146,8 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
                       onPressed: _addCustom,
                       icon: const Icon(Icons.add),
                       style: IconButton.styleFrom(
-                          minimumSize: const Size(40, 40)),
+                        minimumSize: const Size(40, 40),
+                      ),
                     ),
                   ],
                 ),
@@ -1068,25 +1159,31 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
         // Footer
         Container(
           padding: EdgeInsets.fromLTRB(
-              16, 8, 16, MediaQuery.of(context).padding.bottom + 8),
+            16,
+            8,
+            16,
+            MediaQuery.of(context).padding.bottom + 8,
+          ),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+            border: Border(top: BorderSide(color: context.palette.bgTertiary)),
           ),
           child: Row(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: widget.onCancel,
+                  onPressed: () => _closeOnce(widget.onCancel),
                   child: Text(l10n.cancel),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
-                  onPressed: () => widget.onSave(
-                    _selected.toList(),
-                    _notesController.text.trim(),
+                  onPressed: () => _closeOnce(
+                    () => widget.onSave(
+                      _selected.toList(),
+                      _notesController.text.trim(),
+                    ),
                   ),
                   child: Text(l10n.saveChanges),
                 ),
@@ -1130,25 +1227,29 @@ class _SectionTile extends StatelessWidget {
       leading: Text(emoji, style: const TextStyle(fontSize: 20)),
       title: Row(
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: accentColor ??
-                      Theme.of(context).colorScheme.onSurface)),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: accentColor ?? Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
           if (activeCount > 0) ...[
             const SizedBox(width: 8),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text('$activeCount',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold)),
+              child: Text(
+                '$activeCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ],
@@ -1160,11 +1261,13 @@ class _SectionTile extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: tags
-                .map((tag) => _TagToggle(
-                      tag: tag,
-                      selected: selected.contains(tag),
-                      onTap: () => onToggle(tag),
-                    ))
+                .map(
+                  (tag) => _TagToggle(
+                    tag: tag,
+                    selected: selected.contains(tag),
+                    onTap: () => onToggle(tag),
+                  ),
+                )
                 .toList(),
           ),
         ),
@@ -1180,8 +1283,11 @@ class _TagToggle extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _TagToggle(
-      {required this.tag, required this.selected, required this.onTap});
+  const _TagToggle({
+    required this.tag,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1208,17 +1314,18 @@ class _PlatformIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, color) = switch (platform) {
-      'youtube'   => (Icons.smart_display, const Color(0xFFFF0000)),
-      'tiktok'    => (Icons.music_video, Colors.black87),
+      'youtube' => (Icons.smart_display, const Color(0xFFFF0000)),
+      'tiktok' => (Icons.music_video, context.palette.tiktok),
       'instagram' => (Icons.camera_alt, const Color(0xFFE1306C)),
-      'facebook'  => (Icons.facebook, const Color(0xFF1877F2)),
-      _           => (Icons.link, Colors.grey),
+      'facebook' => (Icons.facebook, const Color(0xFF1877F2)),
+      _ => (Icons.link, Colors.grey),
     };
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8)),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Icon(icon, color: color, size: 22),
     );
   }

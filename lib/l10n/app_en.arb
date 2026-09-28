@@ -451,5 +451,13 @@
   "nicknameTaken": "This nickname is already taken",
   "@nicknameTaken": {},
   "nicknameInvalid": "Only letters, numbers, dots and underscores allowed",
-  "@nicknameInvalid": {}
+  "@nicknameInvalid": {},
+  "appearanceSection": "Appearance",
+  "@appearanceSection": {},
+  "themeSystem": "System",
+  "@themeSystem": {},
+  "themeLight": "Light",
+  "@themeLight": {},
+  "themeDark": "Dark",
+  "@themeDark": {}
 }

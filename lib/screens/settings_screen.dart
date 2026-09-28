@@ -6,12 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../utils/tap_guard.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/user_profile_model.dart';
 import '../providers/app_provider.dart';
+import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import 'pin_entry_screen.dart';
+import '../theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   final User user;
@@ -32,9 +35,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     final profile = context.read<AppProvider>().userProfile;
     _nicknameCtrl = TextEditingController(
-        text: profile?.nickname.isNotEmpty == true
-            ? profile!.nickname
-            : widget.user.displayName ?? '');
+      text: profile?.nickname.isNotEmpty == true
+          ? profile!.nickname
+          : widget.user.displayName ?? '',
+    );
   }
 
   @override
@@ -45,12 +49,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String? get _currentPhotoUrl {
     if (_pendingPhotoBytes != null) return null;
-    return _savedPhotoUrl
-        ?? context.read<AppProvider>().userProfile?.photoUrl
-        ?? widget.user.photoURL;
+    return _savedPhotoUrl ??
+        context.read<AppProvider>().userProfile?.photoUrl ??
+        widget.user.photoURL;
   }
 
-  Future<void> _pickPhoto() async {
+  Future<void> _pickPhoto() => runOnce('pickProfilePhoto', _pickPhotoImpl);
+
+  Future<void> _pickPhotoImpl() async {
     final picker = ImagePicker();
     final image = await picker.pickImage(
       source: ImageSource.gallery,
@@ -66,6 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static final _nicknameRegex = RegExp(r'^[a-zA-Z0-9._]+$');
 
   Future<void> _save() async {
+    if (_saving) return;
     // Capture context-dependent values before any async gap
     final l10n = AppLocalizations.of(context);
     final provider = context.read<AppProvider>();
@@ -76,9 +83,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     // Validate format
     if (nickname.isNotEmpty && !_nicknameRegex.hasMatch(nickname)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.nicknameInvalid)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.nicknameInvalid)));
       return;
     }
 
@@ -105,9 +112,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _pendingPhotoBytes = null;
           _savedPhotoUrl = photoUrl;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.profileSaved)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.profileSaved)));
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -137,16 +144,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ? const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2)),
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 )
               : TextButton(
                   onPressed: _save,
-                  child: Text(l10n.save,
-                      style: TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold)),
+                  child: Text(
+                    l10n.save,
+                    style: TextStyle(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
         ],
       ),
@@ -163,24 +174,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   CircleAvatar(
                     radius: 52,
-                    backgroundColor:
-                        theme.colorScheme.primary.withValues(alpha: 0.15),
+                    backgroundColor: theme.colorScheme.primary.withValues(
+                      alpha: 0.15,
+                    ),
                     backgroundImage: _pendingPhotoBytes != null
                         ? MemoryImage(_pendingPhotoBytes!) as ImageProvider
                         : (_currentPhotoUrl != null
-                            ? CachedNetworkImageProvider(_currentPhotoUrl!)
-                            : null),
-                    child: _pendingPhotoBytes == null &&
-                            _currentPhotoUrl == null
+                              ? CachedNetworkImageProvider(_currentPhotoUrl!)
+                              : null),
+                    child:
+                        _pendingPhotoBytes == null && _currentPhotoUrl == null
                         ? Text(
                             (_nicknameCtrl.text.isNotEmpty
                                     ? _nicknameCtrl.text
                                     : widget.user.displayName ?? 'U')[0]
                                 .toUpperCase(),
                             style: TextStyle(
-                                fontSize: 36,
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.bold),
+                              fontSize: 36,
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
                           )
                         : null,
                   ),
@@ -193,10 +206,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         color: theme.colorScheme.primary,
                         shape: BoxShape.circle,
                         border: Border.all(
-                            color: theme.colorScheme.surface, width: 2),
+                          color: theme.colorScheme.surface,
+                          width: 2,
+                        ),
                       ),
-                      child: const Icon(Icons.camera_alt,
-                          size: 16, color: Colors.white),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 16,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ],
@@ -208,8 +226,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: TextButton.icon(
               onPressed: _pickPhoto,
               icon: const Icon(Icons.photo_library_outlined, size: 16),
-              label: Text(l10n.changePhoto,
-                  style: const TextStyle(fontSize: 13)),
+              label: Text(
+                l10n.changePhoto,
+                style: const TextStyle(fontSize: 13),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -232,12 +252,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Current account info (read-only)
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-            child: Text(widget.user.email ?? '',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: Colors.grey[500])),
+            child: Text(
+              widget.user.email ?? '',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: context.palette.textTertiary,
+              ),
+            ),
           ),
 
           const SizedBox(height: 8),
+
+          // ── Appearance section ───────────────────────────────────
+          const Divider(),
+          _SectionHeader(label: l10n.appearanceSection),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: SegmentedButton<ThemeMode>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: ThemeMode.system,
+                  icon: const Icon(Icons.brightness_auto_outlined),
+                  label: Text(l10n.themeSystem),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.light,
+                  icon: const Icon(Icons.light_mode_outlined),
+                  label: Text(l10n.themeLight),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.dark,
+                  icon: const Icon(Icons.dark_mode_outlined),
+                  label: Text(l10n.themeDark),
+                ),
+              ],
+              selected: {context.watch<ThemeProvider>().mode},
+              onSelectionChanged: (s) =>
+                  context.read<ThemeProvider>().setMode(s.first),
+            ),
+          ),
 
           // ── Private section ──────────────────────────────────────
           const Divider(),
@@ -247,7 +301,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.lock_outline),
             title: Text(l10n.changePin),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
+            onTap: () => pushOnce(
               context,
               MaterialPageRoute(
                 builder: (_) => PinEntryScreen(
@@ -265,9 +319,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
-            title: Text(l10n.signOut,
-                style: const TextStyle(color: Colors.red)),
-            onTap: () => AuthService().signOut(),
+            title: Text(
+              l10n.signOut,
+              style: const TextStyle(color: Colors.red),
+            ),
+            onTap: () => runOnce('signOut', AuthService().signOut),
           ),
 
           const SizedBox(height: 40),
@@ -283,13 +339,13 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-      );
+    padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+    child: Text(
+      label,
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 }

@@ -97,15 +97,14 @@ class FirestoreService {
     String targetType,
     String targetId, [
     Map<String, dynamic>? metadata,
-  ]) =>
-      _auditLogs.add({
-        'uid': uid,
-        'action': action,
-        'targetType': targetType,
-        'targetId': targetId,
-        if (metadata != null) 'metadata': metadata,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+  ]) => _auditLogs.add({
+    'uid': uid,
+    'action': action,
+    'targetType': targetType,
+    'targetId': targetId,
+    if (metadata != null) 'metadata': metadata,
+    'createdAt': FieldValue.serverTimestamp(),
+  });
 
   Future<void> incrementUserVideoCount(String uid, int delta) =>
       _userDoc(uid).update({'videoCount': FieldValue.increment(delta)});
@@ -129,11 +128,9 @@ class FirestoreService {
       });
 
   /// Increments reportCount and flags a community pack for moderation review.
-  Future<void> reportCommunityPack(String communityPackId) =>
-      _communityPacks.doc(communityPackId).update({
-        'reportCount': FieldValue.increment(1),
-        'isFlagged': true,
-      });
+  Future<void> reportCommunityPack(String communityPackId) => _communityPacks
+      .doc(communityPackId)
+      .update({'reportCount': FieldValue.increment(1), 'isFlagged': true});
 
   // ── Videos ──────────────────────────────────────────────────
 
@@ -153,14 +150,32 @@ class FirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+  /// Updates only the user-editable fields, so a stale [VideoModel] can't
+  /// overwrite packIds, privacy or counters that changed elsewhere.
+  /// An empty or null [notes] removes the note.
+  Future<void> updateVideoDetails(
+    String uid,
+    String videoId, {
+    List<String>? tags,
+    required String? notes,
+  }) => _videos(uid).doc(videoId).update({
+    if (tags != null) 'tags': tags,
+    'notes': (notes == null || notes.isEmpty) ? FieldValue.delete() : notes,
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
+
   Future<void> deleteVideo(String uid, String videoId) async {
-    final videoSnap = await _videos(uid).doc(videoId).get();
-    final packIds = List<String>.from(videoSnap.data()?['packIds'] ?? []);
+    // Query the packs instead of trusting the video's packIds: that list can
+    // still reference deleted packs, and updating a missing doc fails the
+    // whole batch (so the video never got deleted).
+    final packs = await _packs(
+      uid,
+    ).where('videoIds', arrayContains: videoId).get();
 
     final batch = _db.batch();
     batch.delete(_videos(uid).doc(videoId));
-    for (final packId in packIds) {
-      batch.update(_packs(uid).doc(packId), {
+    for (final p in packs.docs) {
+      batch.update(p.reference, {
         'videoIds': FieldValue.arrayRemove([videoId]),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -168,17 +183,15 @@ class FirestoreService {
     await batch.commit();
 
     // Also drop the video from any community packs those packs are linked to.
-    for (final packId in packIds) {
-      final packSnap = await _packs(uid).doc(packId).get();
-      final communityPackId = packSnap.data()?['communityPackId'] as String?;
+    for (final p in packs.docs) {
+      final communityPackId = p.data()['communityPackId'] as String?;
       if (communityPackId != null) {
         await _cpVideos(communityPackId).doc(videoId).delete();
       }
     }
   }
 
-  Future<void> updateVideoPrivacy(
-          String uid, String videoId, bool isPrivate) =>
+  Future<void> updateVideoPrivacy(String uid, String videoId, bool isPrivate) =>
       _videos(uid).doc(videoId).update({
         'isPrivate': isPrivate,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -191,12 +204,17 @@ class FirestoreService {
       .snapshots()
       .map((s) => s.docs.map(PackModel.fromFirestore).toList());
 
-  Future<String> createPack(String uid, String name) async {
+  Future<String> createPack(
+    String uid,
+    String name, {
+    String description = '',
+    List<String> tags = const [],
+  }) async {
     final now = Timestamp.now();
     final ref = await _packs(uid).add({
       'name': name,
-      'description': '',
-      'tags': <String>[],
+      'description': description,
+      'tags': tags,
       'videoIds': <String>[],
       'createdAt': now,
       'updatedAt': now,
@@ -215,22 +233,26 @@ class FirestoreService {
     String packId, {
     required String description,
     required List<String> tags,
-  }) =>
-      _packs(uid).doc(packId).update({
-        'description': description,
-        'tags': tags,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+  }) => _packs(uid).doc(packId).update({
+    'description': description,
+    'tags': tags,
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 
   Future<void> deletePack(String uid, String packId) async {
     final snap = await _packs(uid).doc(packId).get();
-    final data = snap.data();
-    final videoIds = List<String>.from(data?['videoIds'] ?? []);
-    final communityPackId = data?['communityPackId'] as String?;
+    final communityPackId = snap.data()?['communityPackId'] as String?;
+
+    // Query the videos instead of trusting the pack's videoIds: that list can
+    // still reference deleted videos, and updating a missing doc fails the
+    // whole batch (so the pack never got deleted).
+    final videos = await _videos(
+      uid,
+    ).where('packIds', arrayContains: packId).get();
 
     final batch = _db.batch();
-    for (final vid in videoIds) {
-      batch.update(_videos(uid).doc(vid), {
+    for (final v in videos.docs) {
+      batch.update(v.reference, {
         'packIds': FieldValue.arrayRemove([packId]),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -243,8 +265,7 @@ class FirestoreService {
     }
   }
 
-  Future<void> addVideoToPack(
-      String uid, String packId, String videoId) async {
+  Future<void> addVideoToPack(String uid, String packId, String videoId) async {
     final packSnap = await _packs(uid).doc(packId).get();
     final communityPackId = packSnap.data()?['communityPackId'] as String?;
 
@@ -263,7 +284,9 @@ class FirestoreService {
       final videoSnap = await _videos(uid).doc(videoId).get();
       if (videoSnap.exists) {
         final v = VideoModel.fromFirestore(videoSnap);
-        await _cpVideos(communityPackId).doc(videoId).set(
+        await _cpVideos(communityPackId)
+            .doc(videoId)
+            .set(
               CommunityPackVideo(
                 id: v.id,
                 url: v.url,
@@ -277,7 +300,10 @@ class FirestoreService {
   }
 
   Future<void> removeVideoFromPack(
-      String uid, String packId, String videoId) async {
+    String uid,
+    String packId,
+    String videoId,
+  ) async {
     final packSnap = await _packs(uid).doc(packId).get();
     final communityPackId = packSnap.data()?['communityPackId'] as String?;
 
@@ -371,8 +397,11 @@ class FirestoreService {
     return cpRef.id;
   }
 
-  Future<void> unpublishPack(String uid, String packId,
-      String communityPackId) async {
+  Future<void> unpublishPack(
+    String uid,
+    String packId,
+    String communityPackId,
+  ) async {
     await Future.wait([
       _packs(uid).doc(packId).update({
         'communityPackId': FieldValue.delete(),
@@ -393,23 +422,20 @@ class FirestoreService {
   }
 
   Stream<List<CommunityPackModel>> watchPublicCommunityPacks() =>
-      _communityPacks
-          .where('isPublic', isEqualTo: true)
-          .snapshots()
-          .map((s) {
-            final packs = s.docs
-                .map(CommunityPackModel.fromFirestore)
-                .where((p) => !p.isDeleted)
-                .toList();
-            packs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            return packs;
-          });
+      _communityPacks.where('isPublic', isEqualTo: true).snapshots().map((s) {
+        final packs = s.docs
+            .map(CommunityPackModel.fromFirestore)
+            .where((p) => !p.isDeleted)
+            .toList();
+        packs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return packs;
+      });
 
   Stream<List<CommunityPackVideo>> watchCommunityPackVideos(
-          String communityPackId) =>
-      _cpVideos(communityPackId)
-          .snapshots()
-          .map((s) => s.docs.map(CommunityPackVideo.fromFirestore).toList());
+    String communityPackId,
+  ) => _cpVideos(communityPackId).snapshots().map(
+    (s) => s.docs.map(CommunityPackVideo.fromFirestore).toList(),
+  );
 
   Future<CommunityPackModel?> findPackByCode(String code) async {
     final snap = await _communityPacks
@@ -421,10 +447,9 @@ class FirestoreService {
     return CommunityPackModel.fromFirestore(snap.docs.first);
   }
 
-  Future<void> incrementViewCount(String communityPackId) =>
-      _communityPacks
-          .doc(communityPackId)
-          .update({'viewCount': FieldValue.increment(1)});
+  Future<void> incrementViewCount(String communityPackId) => _communityPacks
+      .doc(communityPackId)
+      .update({'viewCount': FieldValue.increment(1)});
 
   // ── Saved community packs ─────────────────────────────────────
 
@@ -433,21 +458,21 @@ class FirestoreService {
 
   Future<void> saveCommunityPack(String uid, String communityPackId) async {
     await Future.wait([
-      _savedPacks(uid)
-          .doc(communityPackId)
-          .set({'savedAt': FieldValue.serverTimestamp()}),
-      _communityPacks
-          .doc(communityPackId)
-          .update({'shareCount': FieldValue.increment(1)}),
+      _savedPacks(
+        uid,
+      ).doc(communityPackId).set({'savedAt': FieldValue.serverTimestamp()}),
+      _communityPacks.doc(communityPackId).update({
+        'shareCount': FieldValue.increment(1),
+      }),
     ]);
   }
 
   Future<void> unsaveCommunityPack(String uid, String communityPackId) async {
     await Future.wait([
       _savedPacks(uid).doc(communityPackId).delete(),
-      _communityPacks
-          .doc(communityPackId)
-          .update({'shareCount': FieldValue.increment(-1)}),
+      _communityPacks.doc(communityPackId).update({
+        'shareCount': FieldValue.increment(-1),
+      }),
     ]);
   }
 
@@ -465,7 +490,10 @@ class FirestoreService {
   }
 
   Future<void> rateCommunityPack(
-      String uid, String communityPackId, int rating) async {
+    String uid,
+    String communityPackId,
+    int rating,
+  ) async {
     final existing = await getUserRating(uid, communityPackId);
     await _db.runTransaction((tx) async {
       final cpRef = _communityPacks.doc(communityPackId);
@@ -481,8 +509,10 @@ class FirestoreService {
           'ratingSum': FieldValue.increment(rating - existing),
         });
       }
-      tx.set(ratingRef,
-          {'rating': rating, 'ratedAt': FieldValue.serverTimestamp()});
+      tx.set(ratingRef, {
+        'rating': rating,
+        'ratedAt': FieldValue.serverTimestamp(),
+      });
     });
   }
 
@@ -514,8 +544,9 @@ class FirestoreService {
     String uid,
     List<Map<String, String>> questions,
   ) async {
-    await _privateSettings(uid)
-        .set({'securityQuestions': questions}, SetOptions(merge: true));
+    await _privateSettings(
+      uid,
+    ).set({'securityQuestions': questions}, SetOptions(merge: true));
   }
 
   Future<List<Map<String, dynamic>>?> getSecurityQuestions(String uid) async {
@@ -537,9 +568,9 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _nicknames =>
       _db.collection('nicknames');
 
-  Stream<UserProfileModel?> watchProfile(String uid) =>
-      _profileDoc(uid).snapshots().map((doc) =>
-          doc.exists ? UserProfileModel.fromFirestore(doc) : null);
+  Stream<UserProfileModel?> watchProfile(String uid) => _profileDoc(uid)
+      .snapshots()
+      .map((doc) => doc.exists ? UserProfileModel.fromFirestore(doc) : null);
 
   /// Saves the profile and atomically claims the new nickname.
   /// Throws 'nickname_taken' if the nickname is already used by another user.

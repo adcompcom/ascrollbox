@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../utils/tap_guard.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/community_pack_model.dart';
 import '../models/tag_model.dart';
@@ -21,8 +22,7 @@ class CommunityPackDetailScreen extends StatefulWidget {
       _CommunityPackDetailScreenState();
 }
 
-class _CommunityPackDetailScreenState
-    extends State<CommunityPackDetailScreen> {
+class _CommunityPackDetailScreenState extends State<CommunityPackDetailScreen> {
   int? _userRating;
   bool _savingRating = false;
   bool _savingPack = false;
@@ -38,12 +38,19 @@ class _CommunityPackDetailScreenState
   }
 
   Future<void> _loadUserRating() async {
-    final r = await context.read<AppProvider>().getUserRating(_uid, widget.pack.id);
+    final r = await context.read<AppProvider>().getUserRating(
+      _uid,
+      widget.pack.id,
+    );
     if (mounted) setState(() => _userRating = r);
   }
 
   Future<void> _rate(int stars) async {
-    setState(() { _savingRating = true; _userRating = stars; });
+    if (_savingRating) return;
+    setState(() {
+      _savingRating = true;
+      _userRating = stars;
+    });
     await context.read<AppProvider>().ratePack(_uid, widget.pack.id, stars);
     if (mounted) {
       setState(() => _savingRating = false);
@@ -54,6 +61,7 @@ class _CommunityPackDetailScreenState
   }
 
   Future<void> _toggleSave() async {
+    if (_savingPack) return;
     final l10n = AppLocalizations.of(context);
     final provider = context.read<AppProvider>();
     final isSaved = provider.isSavedCommunityPack(widget.pack.id);
@@ -61,12 +69,16 @@ class _CommunityPackDetailScreenState
     try {
       if (isSaved) {
         await provider.unsaveCommunityPack(_uid, widget.pack.id);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.packRemovedFromShared)));
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.packRemovedFromShared)));
       } else {
         await provider.saveCommunityPack(_uid, widget.pack.id);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.packAddedToShared)));
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.packAddedToShared)));
       }
     } finally {
       if (mounted) setState(() => _savingPack = false);
@@ -90,14 +102,15 @@ class _CommunityPackDetailScreenState
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2)),
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   )
                 : IconButton(
-                    icon: Icon(isSaved
-                        ? Icons.bookmark
-                        : Icons.bookmark_outline),
+                    icon: Icon(
+                      isSaved ? Icons.bookmark : Icons.bookmark_outline,
+                    ),
                     tooltip: isSaved
                         ? l10n.packRemoveFromShared
                         : l10n.packAddToShared,
@@ -127,16 +140,19 @@ class _CommunityPackDetailScreenState
                                 ? NetworkImage(pack.ownerPhotoUrl!)
                                 : null,
                             child: pack.ownerPhotoUrl == null
-                                ? Text(pack.ownerName.isNotEmpty
-                                    ? pack.ownerName[0].toUpperCase()
-                                    : '?')
+                                ? Text(
+                                    pack.ownerName.isNotEmpty
+                                        ? pack.ownerName[0].toUpperCase()
+                                        : '?',
+                                  )
                                 : null,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             l10n.packBy(pack.ownerName),
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(color: Colors.grey[600]),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: context.palette.textSecondary,
+                            ),
                           ),
                         ],
                       ),
@@ -144,13 +160,18 @@ class _CommunityPackDetailScreenState
 
                       // Description
                       if (pack.description.isNotEmpty)
-                        Text(pack.description,
-                            style: theme.textTheme.bodyMedium),
+                        Text(
+                          pack.description,
+                          style: theme.textTheme.bodyMedium,
+                        ),
                       if (pack.description.isEmpty)
-                        Text(l10n.packNoDescription,
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(color: Colors.grey[400],
-                                    fontStyle: FontStyle.italic)),
+                        Text(
+                          l10n.packNoDescription,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: context.palette.textTertiary,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
 
                       const SizedBox(height: 12),
 
@@ -164,8 +185,9 @@ class _CommunityPackDetailScreenState
                             final name = t.localized(context);
                             return Chip(
                               label: Text(
-                                  emoji != null ? '$emoji $name' : name,
-                                  style: const TextStyle(fontSize: 11)),
+                                emoji != null ? '$emoji $name' : name,
+                                style: const TextStyle(fontSize: 11),
+                              ),
                               visualDensity: VisualDensity.compact,
                               materialTapTargetSize:
                                   MaterialTapTargetSize.shrinkWrap,
@@ -182,8 +204,10 @@ class _CommunityPackDetailScreenState
 
                       // Rating
                       if (!_isOwner) ...[
-                        Text(l10n.packRateTitle,
-                            style: theme.textTheme.labelLarge),
+                        Text(
+                          l10n.packRateTitle,
+                          style: theme.textTheme.labelLarge,
+                        ),
                         const SizedBox(height: 8),
                         _StarRating(
                           current: _userRating,
@@ -200,8 +224,10 @@ class _CommunityPackDetailScreenState
               videos.isEmpty
                   ? SliverFillRemaining(
                       child: Center(
-                        child: Text(l10n.packEmpty,
-                            style: TextStyle(color: Colors.grey[500])),
+                        child: Text(
+                          l10n.packEmpty,
+                          style: TextStyle(color: context.palette.textTertiary),
+                        ),
                       ),
                     )
                   : SliverPadding(
@@ -210,7 +236,7 @@ class _CommunityPackDetailScreenState
                         delegate: SliverChildBuilderDelegate(
                           (_, i) => _CommunityVideoCard(
                             video: videos[i],
-                            onTap: () => Navigator.push(
+                            onTap: () => pushOnce(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => VideoPlayerScreen(
@@ -223,11 +249,11 @@ class _CommunityPackDetailScreenState
                         ),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.72,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.72,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                            ),
                       ),
                     ),
             ],
@@ -246,15 +272,15 @@ class _CommunityPackDetailScreenState
   }
 
   VideoModel _toVideoModel(CommunityPackVideo v) => VideoModel(
-        id: v.id,
-        url: v.url,
-        platform: v.platform,
-        title: v.title,
-        thumbnailUrl: v.thumbnailUrl,
-        tags: [],
-        packIds: [],
-        createdAt: DateTime.now(),
-      );
+    id: v.id,
+    url: v.url,
+    platform: v.platform,
+    title: v.title,
+    thumbnailUrl: v.thumbnailUrl,
+    tags: [],
+    packIds: [],
+    createdAt: DateTime.now(),
+  );
 }
 
 // ── Stats row ─────────────────────────────────────────────────────────────────
@@ -270,12 +296,14 @@ class _StatsRow extends StatelessWidget {
     return Row(
       children: [
         _Stat(
-            icon: Icons.visibility_outlined,
-            label: l10n.packViews(pack.viewCount)),
+          icon: Icons.visibility_outlined,
+          label: l10n.packViews(pack.viewCount),
+        ),
         const SizedBox(width: 16),
         _Stat(
-            icon: Icons.bookmark_outline,
-            label: l10n.packShares(pack.shareCount)),
+          icon: Icons.bookmark_outline,
+          label: l10n.packShares(pack.shareCount),
+        ),
         const SizedBox(width: 16),
         if (pack.ratingCount > 0)
           _Stat(
@@ -298,14 +326,16 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: iconColor ?? Colors.grey[500]),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 15, color: iconColor ?? context.palette.textTertiary),
+      const SizedBox(width: 4),
+      Text(
+        label,
+        style: TextStyle(fontSize: 12, color: context.palette.textSecondary),
+      ),
+    ],
+  );
 }
 
 // ── Star rating widget ────────────────────────────────────────────────────────
@@ -351,13 +381,14 @@ class _CommunityVideoCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.bgPrimary,
+          color: context.palette.bgPrimary,
           borderRadius: BorderRadius.circular(12),
           boxShadow: const [
             BoxShadow(
-                color: Color(0x0D000000),
-                blurRadius: 12,
-                offset: Offset(0, 2)),
+              color: Color(0x0D000000),
+              blurRadius: 12,
+              offset: Offset(0, 2),
+            ),
           ],
         ),
         child: ClipRRect(
@@ -375,9 +406,9 @@ class _CommunityVideoCard extends StatelessWidget {
                             imageUrl: video.thumbnailUrl,
                             fit: BoxFit.cover,
                             errorWidget: (_, _, _) =>
-                                Container(color: AppColors.bgTertiary),
+                                Container(color: context.palette.bgTertiary),
                           )
-                        : Container(color: AppColors.bgTertiary),
+                        : Container(color: context.palette.bgTertiary),
                     const DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -389,8 +420,11 @@ class _CommunityVideoCard extends StatelessWidget {
                       ),
                     ),
                     const Center(
-                      child: Icon(Icons.play_circle_fill,
-                          size: 32, color: Color(0xB3FFFFFF)),
+                      child: Icon(
+                        Icons.play_circle_fill,
+                        size: 32,
+                        color: Color(0xB3FFFFFF),
+                      ),
                     ),
                   ],
                 ),
@@ -402,10 +436,10 @@ class _CommunityVideoCard extends StatelessWidget {
                     video.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: context.palette.textPrimary,
                       height: 1.3,
                     ),
                   ),

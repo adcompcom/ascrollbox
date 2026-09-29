@@ -270,5 +270,12 @@
   "appearanceSection": "Aparência",
   "themeSystem": "Sistema",
   "themeLight": "Claro",
-  "themeDark": "Escuro"
+  "themeDark": "Escuro",
+  "timeJustNow": "agora",
+  "timeMinutesAgo": "há {count} min",
+  "timeHoursAgo": "{count, plural, =1{há 1 hora} other{há {count} horas}}",
+  "timeDaysAgo": "{count, plural, =1{há 1 dia} other{há {count} dias}}",
+  "timeWeeksAgo": "{count, plural, =1{há 1 semana} other{há {count} semanas}}",
+  "timeMonthsAgo": "{count, plural, =1{há 1 mês} other{há {count} meses}}",
+  "timeYearsAgo": "{count, plural, =1{há 1 ano} other{há {count} anos}}"
 }

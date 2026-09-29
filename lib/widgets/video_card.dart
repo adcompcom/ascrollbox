@@ -5,6 +5,7 @@ import '../models/tag_model.dart';
 import '../models/video_model.dart';
 import '../theme.dart';
 import '../utils/tap_guard.dart';
+import '../utils/time_ago.dart';
 
 class VideoCard extends StatelessWidget {
   final VideoModel video;
@@ -90,6 +91,31 @@ class VideoCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule,
+                            size: 11,
+                            color: context.palette.textTertiary,
+                          ),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: Text(
+                              timeAgo(
+                                AppLocalizations.of(context),
+                                video.createdAt,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: context.palette.textTertiary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),

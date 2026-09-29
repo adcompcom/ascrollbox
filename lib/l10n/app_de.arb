@@ -270,5 +270,12 @@
   "appearanceSection": "Darstellung",
   "themeSystem": "System",
   "themeLight": "Hell",
-  "themeDark": "Dunkel"
+  "themeDark": "Dunkel",
+  "timeJustNow": "gerade eben",
+  "timeMinutesAgo": "vor {count} Min.",
+  "timeHoursAgo": "{count, plural, =1{vor 1 Stunde} other{vor {count} Stunden}}",
+  "timeDaysAgo": "{count, plural, =1{vor 1 Tag} other{vor {count} Tagen}}",
+  "timeWeeksAgo": "{count, plural, =1{vor 1 Woche} other{vor {count} Wochen}}",
+  "timeMonthsAgo": "{count, plural, =1{vor 1 Monat} other{vor {count} Monaten}}",
+  "timeYearsAgo": "{count, plural, =1{vor 1 Jahr} other{vor {count} Jahren}}"
 }
